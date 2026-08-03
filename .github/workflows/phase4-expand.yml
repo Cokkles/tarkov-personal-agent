@@ -6,6 +6,11 @@ on:
       - feature/phase4-source-of-truth
     paths:
       - ".phase4_chunks/**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".phase4_chunks/**"
 
 permissions:
   contents: write
