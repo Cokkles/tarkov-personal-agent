@@ -64,10 +64,25 @@ class ObsSettings(BaseModel):
     stop_recording_on_raid_end: bool = True
 
 
+class ApiSettings(BaseModel):
+    enabled: bool = True
+    host: str = "127.0.0.1"
+    port: int = Field(default=8765, ge=1, le=65535)
+    token: str = ""
+    open_browser: bool = True
+    allowed_evidence_roots: list[Path] = Field(default_factory=list)
+
+
+class DiagnosticSettings(BaseModel):
+    default_capture_seconds: float = Field(default=120.0, gt=0.0, le=3600.0)
+    maximum_lines: int = Field(default=10000, ge=1, le=1_000_000)
+
+
 class RuntimeSettings(BaseModel):
     auto_create_raid_package: bool = True
-    auto_complete_raid_on_end: bool = True
+    auto_complete_raid_on_end: bool = False
     copy_evidence_into_package: bool = False
+    recover_interrupted_sessions: bool = True
     graceful_shutdown_seconds: float = Field(default=10.0, ge=0.0, le=120.0)
 
 
@@ -83,14 +98,22 @@ class AppSettings(BaseSettings):
     process: ProcessSettings = Field(default_factory=ProcessSettings)
     logs: LogSettings = Field(default_factory=LogSettings)
     obs: ObsSettings = Field(default_factory=ObsSettings)
+    api: ApiSettings = Field(default_factory=ApiSettings)
+    diagnostics: DiagnosticSettings = Field(default_factory=DiagnosticSettings)
     runtime: RuntimeSettings = Field(default_factory=RuntimeSettings)
 
     @model_validator(mode="after")
-    def normalize_paths(self) -> AppSettings:
+    def normalize_and_validate(self) -> AppSettings:
         self.paths.data_root = self.paths.data_root.expanduser().resolve()
         self.paths.tarkov_log_roots = [
             path.expanduser().resolve() for path in self.paths.tarkov_log_roots
         ]
+        self.api.allowed_evidence_roots = [
+            path.expanduser().resolve() for path in self.api.allowed_evidence_roots
+        ]
+        loopback_hosts = {"127.0.0.1", "localhost", "::1"}
+        if self.api.enabled and self.api.host not in loopback_hosts and not self.api.token:
+            raise ValueError("A non-loopback API host requires api.token")
         return self
 
     @classmethod
