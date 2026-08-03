@@ -181,8 +181,7 @@ class PPEEngine:
                 )
 
         context_variations = self._context_variations(snapshot)
-        for variation in context_variations:
-            dimension_key = variation.split(":", maxsplit=1)[0]
+        for dimension_key, explanation in context_variations:
             definition = self._registry.get(dimension_key)
             global_estimate = global_estimates.get(dimension_key)
             signals.append(
@@ -194,12 +193,12 @@ class PPEEngine:
                     confidence=(
                         global_estimate.confidence if global_estimate is not None else 0.0
                     ),
-                    explanation=variation.split(":", maxsplit=1)[1].strip(),
+                    explanation=explanation,
                 )
             )
 
-        established = len(
-            [signal for signal in signals if signal.kind is not ProfileSignalKind.UNCERTAIN]
+        established = sum(
+            signal.kind is not ProfileSignalKind.UNCERTAIN for signal in signals
         )
         overview = (
             f"Profile version {snapshot.version} uses {snapshot.evidence_count} evidence records. "
@@ -213,7 +212,7 @@ class PPEEngine:
             signals=signals,
             adaptation_guidance=adaptations,
             training_guidance=training,
-            context_variations=[item.split(":", maxsplit=1)[1].strip() for item in context_variations],
+            context_variations=[explanation for _, explanation in context_variations],
             caveats=snapshot.caveats,
         )
 
@@ -231,10 +230,9 @@ class PPEEngine:
                 weight = self._weight(item, impact, definition.half_life_days, now)
                 if weight <= 0.0:
                     continue
-                raid_key = str(item.raid_id or item.id)
                 observation = _Observation(
                     evidence_id=item.id,
-                    raid_key=raid_key,
+                    raid_key=str(item.raid_id or item.id),
                     occurred_at=item.observed_at,
                     value=impact.value,
                     weight=weight,
@@ -277,7 +275,9 @@ class PPEEngine:
         negative = sum(item.weight for item in capped if item.value < 0.0)
         signed_total = positive + negative
         contradiction_ratio = (
-            2.0 * min(positive, negative) / signed_total if signed_total > 0.0 else 0.0
+            2.0 * min(positive, negative) / signed_total
+            if signed_total > 0.0
+            else 0.0
         )
         contradictory_weight = min(positive, negative)
         consistency = 1.0 - (0.55 * contradiction_ratio)
@@ -289,7 +289,10 @@ class PPEEngine:
             1.0,
             total_weight / max(definition.minimum_evidence_weight, 0.001),
         )
-        confidence = min(1.0, base_confidence * consistency * (0.65 + 0.35 * sufficiency))
+        confidence = min(
+            1.0,
+            base_confidence * consistency * (0.65 + 0.35 * sufficiency),
+        )
         latest = max((item.occurred_at for item in capped), default=None)
         supporting = sorted(capped, key=lambda item: item.weight, reverse=True)
         return ProfileEstimate(
@@ -304,7 +307,12 @@ class PPEEngine:
             contradictory_weight=contradictory_weight,
             last_evidence_at=latest,
             supporting_evidence_ids=[item.evidence_id for item in supporting[:20]],
-            interpretation=self._interpret(dimension_key, score, confidence, contradiction_ratio),
+            interpretation=self._interpret(
+                dimension_key,
+                score,
+                confidence,
+                contradiction_ratio,
+            ),
         )
 
     def _cap_by_raid(self, observations: list[_Observation]) -> list[_Observation]:
@@ -314,7 +322,10 @@ class PPEEngine:
         result: list[_Observation] = []
         for items in grouped.values():
             total = sum(item.weight for item in items)
-            scale = min(1.0, self._settings.maximum_weight_per_raid_dimension / total)
+            scale = min(
+                1.0,
+                self._settings.maximum_weight_per_raid_dimension / total,
+            )
             result.extend(
                 _Observation(
                     evidence_id=item.evidence_id,
@@ -339,14 +350,17 @@ class PPEEngine:
             return "Evidence is currently insufficient for a stable interpretation."
         if contradiction_ratio >= 0.55:
             return (
-                "Evidence is meaningfully contradictory; performance likely depends on context or "
-                "the current sample is too mixed for one conclusion."
+                "Evidence is meaningfully contradictory; performance likely depends on context "
+                "or the current sample is too mixed for one conclusion."
             )
         if score >= self._settings.signal_threshold:
             return f"Current evidence indicates the player {definition.positive_label}."
         if score <= -self._settings.signal_threshold:
             return f"Current evidence indicates the player {definition.negative_label}."
-        return "Current evidence is near neutral or does not yet show a consistent directional pattern."
+        return (
+            "Current evidence is near neutral or does not yet show a consistent "
+            "directional pattern."
+        )
 
     def _summaries(
         self,
@@ -373,9 +387,15 @@ class PPEEngine:
         estimates: list[ProfileEstimate],
     ) -> list[str]:
         caveats = [
-            "A profile estimate is a weighted description of recorded evidence, not a permanent trait.",
-            "Raid outcomes are not treated as pure skill measurements; low-control outcomes retain low weight.",
-            "Adaptation guidance and deliberate training guidance are intentionally separated.",
+            (
+                "A profile estimate is a weighted description of recorded evidence, "
+                "not a permanent trait."
+            ),
+            (
+                "Raid outcomes are not pure skill measurements; low-control outcomes "
+                "retain low weight."
+            ),
+            "Adaptation guidance and deliberate training guidance remain separate.",
         ]
         raid_count = len({item.raid_id for item in evidence if item.raid_id is not None})
         if raid_count < self._settings.minimum_independent_raids:
@@ -389,7 +409,7 @@ class PPEEngine:
         ]
         if contradictory:
             caveats.append(
-                "Several dimensions contain contradictory evidence and should be interpreted by context."
+                "Several dimensions contain contradictory evidence and require contextual review."
             )
         return caveats
 
@@ -398,10 +418,12 @@ class PPEEngine:
         previous: ProfileSnapshot | None,
         current: ProfileSnapshot,
     ) -> list[DimensionChange]:
-        prior = {
-            (item.dimension_key, item.context_key): item
-            for item in previous.estimates
-        } if previous is not None else {}
+        prior: dict[tuple[str, str], ProfileEstimate] = {}
+        if previous is not None:
+            prior = {
+                (item.dimension_key, item.context_key): item
+                for item in previous.estimates
+            }
         changes: list[DimensionChange] = []
         for estimate in current.estimates:
             old = prior.get((estimate.dimension_key, estimate.context_key))
@@ -422,11 +444,14 @@ class PPEEngine:
             )
         return changes
 
-    def _context_variations(self, snapshot: ProfileSnapshot) -> list[str]:
+    def _context_variations(
+        self,
+        snapshot: ProfileSnapshot,
+    ) -> list[tuple[str, str]]:
         by_dimension: dict[str, list[ProfileEstimate]] = defaultdict(list)
         for estimate in snapshot.estimates:
             by_dimension[estimate.dimension_key].append(estimate)
-        variations: list[str] = []
+        variations: list[tuple[str, str]] = []
         for dimension_key, estimates in by_dimension.items():
             global_estimate = next(
                 (item for item in estimates if item.context_key == "global"),
@@ -443,12 +468,13 @@ class PPEEngine:
                 if abs(delta) < self._settings.context_difference_threshold:
                     continue
                 direction = "stronger" if delta > 0 else "weaker"
-                variations.append(
-                    f"{dimension_key}: {self._registry.get(dimension_key).label} appears "
-                    f"{direction} in context `{contextual.context_key}` "
-                    f"(context score {contextual.score:+.2f}, global {global_estimate.score:+.2f})."
+                explanation = (
+                    f"{self._registry.get(dimension_key).label} appears {direction} in "
+                    f"context `{contextual.context_key}` (context score "
+                    f"{contextual.score:+.2f}, global {global_estimate.score:+.2f})."
                 )
-        return sorted(variations)
+                variations.append((dimension_key, explanation))
+        return sorted(variations, key=lambda item: (item[0], item[1]))
 
 
 def report_to_markdown(report: ProfileReport) -> str:
