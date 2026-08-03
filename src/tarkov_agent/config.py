@@ -66,6 +66,7 @@ class ObsSettings(BaseModel):
 
 class RuntimeSettings(BaseModel):
     auto_create_raid_package: bool = True
+    auto_complete_raid_on_end: bool = True
     copy_evidence_into_package: bool = False
     graceful_shutdown_seconds: float = Field(default=10.0, ge=0.0, le=120.0)
 
