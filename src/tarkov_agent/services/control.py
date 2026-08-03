@@ -6,7 +6,13 @@ from pathlib import Path
 from typing import Any
 
 from tarkov_agent.config import AppSettings
-from tarkov_agent.domain.models import EvidenceKind, MarkerCommand, RaidRecord, RaidState, TimelineEvent
+from tarkov_agent.domain.models import (
+    EvidenceKind,
+    MarkerCommand,
+    RaidRecord,
+    RaidState,
+    TimelineEvent,
+)
 from tarkov_agent.domain.state_machine import InvalidTransition, RaidSignal
 from tarkov_agent.services.coordinator import RaidCoordinator
 from tarkov_agent.services.markers import MarkerService
@@ -132,7 +138,10 @@ class ManualControlService:
             source_path,
             kind,
             copy_into_package=copy_into_package,
-            metadata={"source": "manual-reference", "attached_at": datetime.now(UTC).isoformat()},
+            metadata={
+                "source": "manual-reference",
+                "attached_at": datetime.now(UTC).isoformat(),
+            },
         )
         self._repository.save_raid(updated)
         return EvidenceAttachment(updated, str(evidence.id))
