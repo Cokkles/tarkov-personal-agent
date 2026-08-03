@@ -4,7 +4,7 @@ import hashlib
 import json
 import re
 import shutil
-from datetime import UTC, datetime
+from datetime import UTC
 from pathlib import Path
 
 from tarkov_agent.domain.models import EvidenceKind, EvidenceReference, RaidRecord, TimelineEvent
