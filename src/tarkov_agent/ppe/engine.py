@@ -252,7 +252,7 @@ class PPEEngine:
         if observed_at.tzinfo is None:
             observed_at = observed_at.replace(tzinfo=UTC)
         age_days = max(0.0, (now - observed_at).total_seconds() / 86400.0)
-        recency = 0.5 ** (age_days / half_life_days)
+        recency = math.pow(0.5, age_days / half_life_days)
         return (
             evidence.reliability
             * impact.strength
