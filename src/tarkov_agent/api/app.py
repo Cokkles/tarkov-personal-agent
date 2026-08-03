@@ -304,7 +304,7 @@ def create_app(context: AgentContext, *, start_runtime: bool = True) -> FastAPI:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.get("/api/ppe/dimensions", response_model=list[DimensionDefinition])
-    async def ppe_dimensions() -> list[object]:
+    async def ppe_dimensions() -> list[DimensionDefinition]:
         return context.ppe.dimensions()
 
     @app.get("/api/ppe/profile", response_model=ProfileSnapshot)
