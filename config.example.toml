@@ -46,6 +46,18 @@ allowed_evidence_roots = []
 default_capture_seconds = 120.0
 maximum_lines = 10000
 
+[ppe]
+enabled = true
+neutral_prior_weight = 1.25
+confidence_weight_scale = 2.5
+maximum_weight_per_raid_dimension = 1.0
+minimum_report_confidence = 0.25
+minimum_established_confidence = 0.50
+signal_threshold = 0.20
+context_difference_threshold = 0.35
+minimum_independent_raids = 3
+maximum_history = 200
+
 [runtime]
 auto_create_raid_package = true
 auto_complete_raid_on_end = false
