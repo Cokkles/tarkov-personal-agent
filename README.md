@@ -11,9 +11,29 @@ The project combines four systems:
 
 ## Project status
 
-**Phase 0: Foundation and architecture**
+**Phase 1 core is in active development.**
 
-The repository is the canonical blueprint for rebuilding and maintaining the system. Large evidence files such as full raid videos, screenshots, exported logs, PDFs, and research archives belong outside Git in the linked Google Drive project folder.
+The repository now contains the first runnable local foundation: typed configuration, process and log observers, a raid lifecycle state machine, OBS recording control, raid packages, SQLite persistence, markers, CLI diagnostics, migrations, and tests.
+
+No Tarkov log signatures ship enabled yet. Automatic raid detection remains disabled until current log samples are collected and the rules are verified against false positives.
+
+## Quick start
+
+Requirements: Python 3.12 and a local clone of this repository.
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
+tarkov-agent init --output config.toml
+tarkov-agent doctor --config config.toml
+```
+
+After adding verified local log paths and enabling OBS WebSocket in `config.toml`:
+
+```powershell
+tarkov-agent run --config config.toml
+```
 
 ## Core principles
 
@@ -28,22 +48,22 @@ The repository is the canonical blueprint for rebuilding and maintaining the sys
 ## Repository areas
 
 - `docs/` — charter, requirements, architecture, safety, decisions, roadmap
-- `schemas/` — versioned JSON schemas and database design
-- `apps/raid-companion/` — Windows companion application
-- `apps/raid-review/` — post-raid review interface
-- `packages/` — shared domain, parsing, timeline, PPE, and source-validation modules
-- `prompts/` — versioned AI prompts and output contracts
-- `knowledge-base/` — source policies, claim records, and curated notes
-- `tests/` — fixtures, unit, integration, and end-to-end tests
-- `scripts/` — development and data-maintenance utilities
+- `src/tarkov_agent/` — current Python application and domain packages
+- `migrations/` — versioned database migrations
+- `schemas/` — planned versioned interchange schemas
+- `prompts/` — planned AI prompts and output contracts
+- `knowledge-base/` — planned source policies, claim records, and curated notes
+- `tests/` — unit and integration tests
+- `scripts/` — planned development and data-maintenance utilities
 
 ## Data boundary
 
-Git stores source code, schemas, prompts, documentation, and small test fixtures. It does **not** store normal raid videos, private account exports, credentials, or large raw log archives.
+Git stores source code, schemas, prompts, documentation, and small test fixtures. It does **not** store normal raid videos, private account exports, credentials, or large raw log archives. Large evidence files belong in the local data root and, when deliberately archived, the linked Google Drive project folder.
 
 Start with:
 
 - [`docs/PROJECT_CHARTER.md`](docs/PROJECT_CHARTER.md)
 - [`docs/architecture/SYSTEM_OVERVIEW.md`](docs/architecture/SYSTEM_OVERVIEW.md)
+- [`docs/implementation/PHASE1_CORE.md`](docs/implementation/PHASE1_CORE.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
 - [`docs/SAFETY_AND_COMPLIANCE.md`](docs/SAFETY_AND_COMPLIANCE.md)
