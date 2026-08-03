@@ -28,11 +28,16 @@ class PathSettings(BaseModel):
     def ppe_root(self) -> Path:
         return self.data_root / "ppe"
 
+    @property
+    def source_truth_root(self) -> Path:
+        return self.data_root / "source-truth"
+
     def ensure_directories(self) -> None:
         self.data_root.mkdir(parents=True, exist_ok=True)
         self.raids_root.mkdir(parents=True, exist_ok=True)
         self.diagnostics_root.mkdir(parents=True, exist_ok=True)
         self.ppe_root.mkdir(parents=True, exist_ok=True)
+        self.source_truth_root.mkdir(parents=True, exist_ok=True)
 
 
 class ProcessSettings(BaseModel):
@@ -96,6 +101,16 @@ class PpeSettings(BaseModel):
     maximum_history: int = Field(default=200, ge=1, le=10000)
 
 
+class SourceTruthSettings(BaseModel):
+    enabled: bool = True
+    seed_default_sources: bool = True
+    minimum_verification_score: float = Field(default=0.72, ge=0.0, le=1.0)
+    minimum_supporting_citations: int = Field(default=1, ge=1, le=20)
+    claim_review_interval_days: int = Field(default=30, ge=1, le=3650)
+    source_review_interval_days: int = Field(default=30, ge=1, le=3650)
+    stale_grace_days: int = Field(default=14, ge=0, le=3650)
+
+
 class RuntimeSettings(BaseModel):
     auto_create_raid_package: bool = True
     auto_complete_raid_on_end: bool = False
@@ -119,6 +134,7 @@ class AppSettings(BaseSettings):
     api: ApiSettings = Field(default_factory=ApiSettings)
     diagnostics: DiagnosticSettings = Field(default_factory=DiagnosticSettings)
     ppe: PpeSettings = Field(default_factory=PpeSettings)
+    truth: SourceTruthSettings = Field(default_factory=SourceTruthSettings)
     runtime: RuntimeSettings = Field(default_factory=RuntimeSettings)
 
     @model_validator(mode="after")

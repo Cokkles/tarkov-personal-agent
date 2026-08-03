@@ -11,14 +11,16 @@ from pathlib import Path
 
 import uvicorn
 
-from tarkov_agent.api.app import create_app
+from tarkov_agent.api.application import create_app
 from tarkov_agent.app_context import AgentContext, build_context
 from tarkov_agent.config import AppSettings
+from tarkov_agent.domain.source_truth import GameScope, MechanicsQuery
 from tarkov_agent.integrations.obs import ObsIntegrationError, build_recording_controller
 from tarkov_agent.observers.logs import LogTailObserver
 from tarkov_agent.observers.process import ProcessObserver
 from tarkov_agent.services.diagnostics import DiagnosticCaptureService
 from tarkov_agent.services.ppe import PPEDisabledError
+from tarkov_agent.services.source_truth import SourceTruthDisabledError
 
 _CONFIG_TEMPLATE = """# Tarkov Personal Agent configuration
 
@@ -76,6 +78,15 @@ signal_threshold = 0.20
 context_difference_threshold = 0.35
 minimum_independent_raids = 3
 maximum_history = 200
+
+[truth]
+enabled = true
+seed_default_sources = true
+minimum_verification_score = 0.72
+minimum_supporting_citations = 1
+claim_review_interval_days = 30
+source_review_interval_days = 30
+stale_grace_days = 14
 
 [runtime]
 auto_create_raid_package = true
@@ -144,6 +155,7 @@ def _command_doctor(args: argparse.Namespace) -> int:
             "evidence_count": len(context.ppe.evidence(limit=10000)),
             "profile_root": str(settings.paths.ppe_root),
         },
+        "source_truth": context.truth.status(),
         "obs": {"enabled": settings.obs.enabled},
     }
 
@@ -244,6 +256,58 @@ def _command_ppe_rebuild(args: argparse.Namespace) -> int:
     return 0
 
 
+def _command_truth_status(args: argparse.Namespace) -> int:
+    context = _context(args.config)
+    print(json.dumps(context.truth.status(), indent=2))
+    return 0
+
+
+def _command_truth_query(args: argparse.Namespace) -> int:
+    context = _context(args.config)
+    try:
+        result = context.truth.query(
+            MechanicsQuery(
+                key=args.key,
+                game=GameScope(args.game),
+                patch_version=args.patch,
+                include_stale=args.include_stale,
+            )
+        )
+    except SourceTruthDisabledError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    print(result.model_dump_json(indent=2))
+    return 0 if result.can_recommend else 3
+
+
+def _command_truth_review_queue(args: argparse.Namespace) -> int:
+    context = _context(args.config)
+    tasks = context.truth.review_queue()
+    print(json.dumps([task.model_dump(mode="json") for task in tasks], indent=2))
+    return 0
+
+
+def _command_truth_export(args: argparse.Namespace) -> int:
+    context = _context(args.config)
+    try:
+        content = (
+            context.truth.export_markdown()
+            if args.format == "markdown"
+            else context.truth.export_json()
+        )
+    except SourceTruthDisabledError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    if args.output:
+        output = Path(args.output).expanduser().resolve()
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(content, encoding="utf-8")
+        print(f"Wrote Source-of-Truth export: {output}")
+    else:
+        print(content, end="" if content.endswith("\n") else "\n")
+    return 0
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="tarkov-agent",
@@ -295,6 +359,48 @@ def _parser() -> argparse.ArgumentParser:
     ppe_parser.add_argument("--config")
     ppe_parser.add_argument("--force", action="store_true")
     ppe_parser.set_defaults(func=_command_ppe_rebuild)
+
+    truth_status_parser = subparsers.add_parser(
+        "truth-status",
+        help="Show Source-of-Truth source, claim, conflict, and review counts",
+    )
+    truth_status_parser.add_argument("--config")
+    truth_status_parser.set_defaults(func=_command_truth_status)
+
+    truth_query_parser = subparsers.add_parser(
+        "truth-query",
+        help="Resolve a mechanics claim and refuse unresolved or conflicting values",
+    )
+    truth_query_parser.add_argument("key")
+    truth_query_parser.add_argument(
+        "--game",
+        choices=[scope.value for scope in GameScope],
+        default=GameScope.TARKOV.value,
+    )
+    truth_query_parser.add_argument("--patch")
+    truth_query_parser.add_argument("--include-stale", action="store_true")
+    truth_query_parser.add_argument("--config")
+    truth_query_parser.set_defaults(func=_command_truth_query)
+
+    truth_queue_parser = subparsers.add_parser(
+        "truth-review-queue",
+        help="List due source reviews, claim reviews, and blocking conflicts",
+    )
+    truth_queue_parser.add_argument("--config")
+    truth_queue_parser.set_defaults(func=_command_truth_review_queue)
+
+    truth_export_parser = subparsers.add_parser(
+        "truth-export",
+        help="Export the Source-of-Truth corpus with preserved citations",
+    )
+    truth_export_parser.add_argument("--config")
+    truth_export_parser.add_argument(
+        "--format",
+        choices=["markdown", "json"],
+        default="markdown",
+    )
+    truth_export_parser.add_argument("--output")
+    truth_export_parser.set_defaults(func=_command_truth_export)
     return parser
 
 

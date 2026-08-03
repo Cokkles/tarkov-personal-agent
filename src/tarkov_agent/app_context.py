@@ -13,7 +13,9 @@ from tarkov_agent.services.packages import RaidPackageBuilder
 from tarkov_agent.services.ppe import PPEProfileService
 from tarkov_agent.services.recovery import RecoveryService
 from tarkov_agent.services.reviews import RaidReviewService
+from tarkov_agent.services.source_truth import SourceTruthService
 from tarkov_agent.storage.database import RaidRepository
+from tarkov_agent.storage.source_truth import SourceTruthRepository
 
 
 @dataclass(slots=True)
@@ -27,6 +29,7 @@ class AgentContext:
     runtime: CompanionRuntime
     reviews: RaidReviewService
     ppe: PPEProfileService
+    truth: SourceTruthService
     recovery: RecoveryService
     controls: ManualControlService
 
@@ -46,6 +49,8 @@ def build_context(settings: AppSettings) -> AgentContext:
     settings.prepare()
     repository = RaidRepository(settings.paths.database_path)
     repository.initialize()
+    truth_repository = SourceTruthRepository(settings.paths.database_path)
+    truth_repository.initialize()
     packages = RaidPackageBuilder(settings.paths.raids_root)
     recording = build_recording_controller(settings.obs)
     markers = MarkerService(repository, packages)
@@ -53,6 +58,12 @@ def build_context(settings: AppSettings) -> AgentContext:
     runtime = CompanionRuntime(settings, coordinator)
     reviews = RaidReviewService(repository, packages)
     ppe = PPEProfileService(repository, settings.paths.ppe_root, settings.ppe)
+    truth = SourceTruthService(
+        truth_repository,
+        settings.paths.source_truth_root,
+        settings.truth,
+    )
+    truth.initialize()
     recovery = RecoveryService(repository, packages)
     controls = ManualControlService(settings, coordinator, markers, repository, packages)
     return AgentContext(
@@ -65,6 +76,7 @@ def build_context(settings: AppSettings) -> AgentContext:
         runtime=runtime,
         reviews=reviews,
         ppe=ppe,
+        truth=truth,
         recovery=recovery,
         controls=controls,
     )
