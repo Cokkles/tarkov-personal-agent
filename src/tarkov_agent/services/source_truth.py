@@ -464,8 +464,12 @@ class SourceTruthService:
                 marker = f"truth-{footnote_index}"
                 footnote_index += 1
                 references.append(f"[^{marker}]")
-                source = sources.get(citation.source_id)
-                source_name = source.name if source is not None else "Unknown source"
+                citation_source = sources.get(citation.source_id)
+                source_name = (
+                    citation_source.name
+                    if citation_source is not None
+                    else "Unknown source"
+                )
                 locator = f"; {citation.locator}" if citation.locator else ""
                 revision = (
                     f"; revision {citation.source_revision}"
