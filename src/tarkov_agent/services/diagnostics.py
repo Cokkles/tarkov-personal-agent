@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 import re
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -28,7 +29,8 @@ class DiagnosticRedactor:
         (
             "guid",
             re.compile(
-                r"\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b",
+                r"\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}"
+                r"-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b",
                 re.I,
             ),
         ),
@@ -48,14 +50,19 @@ class DiagnosticRedactor:
         for kind, pattern in self._PATTERNS:
             if kind == "secret":
                 redacted = pattern.sub(
-                    lambda match: f"{match.group(1)}=<REDACTED:{kind}>",
+                    lambda match, label=kind: (
+                        f"{match.group(1)}=<REDACTED:{label}>"
+                    ),
                     redacted,
                 )
             elif kind == "windows_user":
                 redacted = pattern.sub(r"C:\\Users\\<REDACTED:user>", redacted)
             else:
                 redacted = pattern.sub(
-                    lambda match: self._placeholder(kind, match.group(0)),
+                    lambda match, label=kind: self._placeholder(
+                        label,
+                        match.group(0),
+                    ),
                     redacted,
                 )
         return redacted
@@ -85,7 +92,10 @@ class DiagnosticCaptureService:
         maximum_lines: int = 10000,
     ) -> DiagnosticCaptureResult:
         started = datetime.now(UTC)
-        safe_label = re.sub(r"[^A-Za-z0-9._-]+", "-", label).strip("-._") or "log-capture"
+        safe_label = (
+            re.sub(r"[^A-Za-z0-9._-]+", "-", label).strip("-._")
+            or "log-capture"
+        )
         folder = self._root / f"{started.strftime('%Y%m%d_%H%M%S')}_{safe_label}"
         folder.mkdir(parents=True, exist_ok=False)
         events_path = folder / "events.jsonl"
@@ -100,10 +110,8 @@ class DiagnosticCaptureService:
                 if line_count >= maximum_lines:
                     return
 
-        try:
+        with suppress(TimeoutError):
             await asyncio.wait_for(collect(), timeout=duration_seconds)
-        except TimeoutError:
-            pass
 
         finished = datetime.now(UTC)
         manifest = {
@@ -120,7 +128,9 @@ class DiagnosticCaptureService:
         return DiagnosticCaptureResult(folder, events_path, manifest_path, line_count)
 
     def _append(self, path: Path, line: LogLine) -> None:
-        source_hash = hashlib.sha256(str(line.path).encode("utf-8")).hexdigest()[:12]
+        source_hash = hashlib.sha256(
+            str(line.path).encode("utf-8")
+        ).hexdigest()[:12]
         payload = {
             "observed_at": line.observed_at.isoformat(),
             "source": f"log-{source_hash}",
