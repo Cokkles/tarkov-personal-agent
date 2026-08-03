@@ -1,5 +1,5 @@
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from tarkov_agent.config import PpeSettings
 from tarkov_agent.domain.ppe import (
@@ -15,12 +15,12 @@ from tarkov_agent.ppe.registry import DEFAULT_DIMENSION_REGISTRY
 def _evidence(
     value: float,
     *,
-    raid_id: object | None = None,
+    raid_id: UUID | None = None,
     age_days: int = 0,
     map_name: str | None = None,
 ) -> PPEEvidence:
     return PPEEvidence(
-        raid_id=raid_id or uuid4(),  # type: ignore[arg-type]
+        raid_id=raid_id or uuid4(),
         source=EvidenceSource.ENCOUNTER_REVIEW,
         source_reference=str(uuid4()),
         observed_at=datetime.now(UTC) - timedelta(days=age_days),
