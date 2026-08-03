@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tarkov-personal-agent"
-version = "0.2.0"
+version = "0.3.0"
 description = "Local-first passive raid companion and personal playstyle analytics platform"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -40,6 +40,7 @@ packages = ["src/tarkov_agent"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "src/tarkov_agent/api/static/index.html" = "tarkov_agent/api/static/index.html"
+"src/tarkov_agent/api/static/ppe.html" = "tarkov_agent/api/static/ppe.html"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
