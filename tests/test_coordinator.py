@@ -7,6 +7,7 @@ from tarkov_agent.integrations.obs import RecordingStatus
 from tarkov_agent.services.coordinator import RaidCoordinator
 from tarkov_agent.services.markers import MarkerService
 from tarkov_agent.services.packages import RaidPackageBuilder
+from tarkov_agent.services.reviews import RaidReviewService
 from tarkov_agent.storage.database import RaidRepository
 
 
@@ -30,7 +31,12 @@ def _coordinator(
     tmp_path: Path,
     *,
     auto_complete: bool,
-) -> tuple[RaidCoordinator, RaidRepository, FakeRecordingController]:
+) -> tuple[
+    RaidCoordinator,
+    RaidRepository,
+    RaidPackageBuilder,
+    FakeRecordingController,
+]:
     settings = AppSettings(
         paths=PathSettings(data_root=tmp_path),
         obs=ObsSettings(enabled=True),
@@ -43,11 +49,14 @@ def _coordinator(
     markers = MarkerService(repository, packages)
     recording = FakeRecordingController()
     coordinator = RaidCoordinator(settings, repository, packages, markers, recording)
-    return coordinator, repository, recording
+    return coordinator, repository, packages, recording
 
 
-def test_coordinator_supports_explicit_review_completion(tmp_path: Path) -> None:
-    coordinator, repository, recording = _coordinator(tmp_path, auto_complete=False)
+def test_coordinator_queues_explicit_review(tmp_path: Path) -> None:
+    coordinator, repository, packages, recording = _coordinator(
+        tmp_path,
+        auto_complete=False,
+    )
 
     coordinator.handle_signal(RaidSignal.GAME_FOUND)
     coordinator.handle_signal(
@@ -60,18 +69,27 @@ def test_coordinator_supports_explicit_review_completion(tmp_path: Path) -> None
     assert coordinator.active_raid.state is RaidState.IN_RAID
     assert recording.active is True
 
-    coordinator.handle_signal(RaidSignal.RAID_ENDED)
-    coordinator.handle_signal(RaidSignal.REVIEW_COMPLETED)
+    coordinator.handle_signal(RaidSignal.RAID_ENDED, payload={"result": "Survived"})
+
+    pending = repository.get_raid(raid_id)
+    assert pending is not None
+    assert pending.state is RaidState.REVIEW_PENDING
+    assert pending.result == "Survived"
+    assert coordinator.active_raid is None
+    assert recording.active is False
+
+    review_service = RaidReviewService(repository, packages)
+    review = review_service.get_or_create(raid_id)
+    review_service.finalize(raid_id, review, expected_version=0)
 
     restored = repository.get_raid(raid_id)
     assert restored is not None
     assert restored.state is RaidState.COMPLETE
     assert restored.ended_at is not None
-    assert recording.active is False
 
 
 def test_headless_mode_auto_completes_and_allows_next_raid(tmp_path: Path) -> None:
-    coordinator, repository, _ = _coordinator(tmp_path, auto_complete=True)
+    coordinator, repository, _, _ = _coordinator(tmp_path, auto_complete=True)
 
     coordinator.handle_signal(RaidSignal.GAME_FOUND)
     coordinator.handle_signal(RaidSignal.RAID_STARTED, payload={"map_name": "Customs"})
