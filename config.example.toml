@@ -37,5 +37,6 @@ stop_recording_on_raid_end = true
 
 [runtime]
 auto_create_raid_package = true
+auto_complete_raid_on_end = true
 copy_evidence_into_package = false
 graceful_shutdown_seconds = 10.0
