@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from tarkov_agent.config import AppSettings
-from tarkov_agent.domain.models import EvidenceKind, RaidRecord, TimelineEvent
+from tarkov_agent.domain.models import EvidenceKind, RaidRecord, RaidState, TimelineEvent
 from tarkov_agent.domain.state_machine import RaidLifecycle, RaidSignal, StateTransition
 from tarkov_agent.integrations.obs import ObsIntegrationError, RecordingController
 from tarkov_agent.observers.process import ProcessSnapshot
@@ -64,6 +64,13 @@ class RaidCoordinator:
             self._start_raid(timestamp, details, transition)
         elif signal is RaidSignal.RAID_ENDED:
             self._end_raid(timestamp, transition)
+            if self.settings.runtime.auto_complete_raid_on_end:
+                completion = self.lifecycle.apply(
+                    RaidSignal.REVIEW_COMPLETED,
+                    occurred_at=timestamp,
+                    reason="Headless runtime auto-completed post-raid review",
+                )
+                self._complete_review(completion)
         elif signal is RaidSignal.REVIEW_COMPLETED:
             self._complete_review(transition)
         elif signal in {RaidSignal.ABORT, RaidSignal.GAME_LOST} and self.active_raid is not None:
@@ -190,7 +197,7 @@ class RaidCoordinator:
                     {"error": str(exc)},
                 )
         self._persist_active()
-        if transition.to_state.value == "aborted":
+        if transition.to_state is RaidState.ABORTED:
             self.markers.deactivate()
             self.active_raid = None
 
