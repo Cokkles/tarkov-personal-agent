@@ -17,7 +17,7 @@ def _evidence(
     *,
     raid_id: UUID | None = None,
     age_days: int = 0,
-    map_name: str | None = None,
+    range_band: str = "close",
 ) -> PPEEvidence:
     return PPEEvidence(
         raid_id=raid_id or uuid4(),
@@ -25,7 +25,7 @@ def _evidence(
         source_reference=str(uuid4()),
         observed_at=datetime.now(UTC) - timedelta(days=age_days),
         reliability=0.9,
-        context=PPEContext(map_name=map_name, range_band="close"),
+        context=PPEContext(range_band=range_band),
         impacts=[
             DimensionImpact(
                 dimension_key="reactive_close_range_effectiveness",
@@ -86,10 +86,10 @@ def test_contradictory_evidence_reduces_confidence() -> None:
 
 def test_context_estimates_are_kept_separate() -> None:
     evidence = [
-        _evidence(0.9, map_name="Interchange"),
-        _evidence(0.9, map_name="Interchange"),
-        _evidence(-0.9, map_name="Factory"),
-        _evidence(-0.9, map_name="Factory"),
+        _evidence(0.9, range_band="close"),
+        _evidence(0.9, range_band="close"),
+        _evidence(-0.9, range_band="medium"),
+        _evidence(-0.9, range_band="medium"),
     ]
     snapshot = _engine().build(
         evidence,
@@ -97,17 +97,17 @@ def test_context_estimates_are_kept_separate() -> None:
         evidence_fingerprint="d" * 64,
     ).snapshot
 
-    interchange = snapshot.estimate(
+    close = snapshot.estimate(
         "reactive_close_range_effectiveness",
-        "map_name=interchange",
+        "range_band=close",
     )
-    factory = snapshot.estimate(
+    medium = snapshot.estimate(
         "reactive_close_range_effectiveness",
-        "map_name=factory",
+        "range_band=medium",
     )
-    assert interchange is not None and factory is not None
-    assert interchange.score > 0
-    assert factory.score < 0
+    assert close is not None and medium is not None
+    assert close.score > 0
+    assert medium.score < 0
 
 
 def test_recent_evidence_outweighs_old_evidence() -> None:
