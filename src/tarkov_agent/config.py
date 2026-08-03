@@ -50,6 +50,7 @@ class LogSettings(BaseModel):
     file_globs: tuple[str, ...] = ("*.log", "*.txt")
     poll_interval_seconds: float = Field(default=1.0, gt=0.1, le=60.0)
     start_at_end: bool = True
+    minimum_auto_signal_confidence: float = Field(default=0.90, ge=0.0, le=1.0)
     rules: list[LogSignalRule] = Field(default_factory=list)
 
 
@@ -86,7 +87,9 @@ class AppSettings(BaseSettings):
     @model_validator(mode="after")
     def normalize_paths(self) -> AppSettings:
         self.paths.data_root = self.paths.data_root.expanduser().resolve()
-        self.paths.tarkov_log_roots = [path.expanduser().resolve() for path in self.paths.tarkov_log_roots]
+        self.paths.tarkov_log_roots = [
+            path.expanduser().resolve() for path in self.paths.tarkov_log_roots
+        ]
         return self
 
     @classmethod
