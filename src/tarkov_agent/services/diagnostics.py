@@ -7,6 +7,7 @@ import re
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 
 from tarkov_agent.observers.logs import LogLine, LogTailObserver
@@ -49,23 +50,21 @@ class DiagnosticRedactor:
         redacted = value
         for kind, pattern in self._PATTERNS:
             if kind == "secret":
-                redacted = pattern.sub(
-                    lambda match, label=kind: (
-                        f"{match.group(1)}=<REDACTED:{label}>"
-                    ),
-                    redacted,
-                )
+                redacted = pattern.sub(self._secret_replacement, redacted)
             elif kind == "windows_user":
                 redacted = pattern.sub(r"C:\\Users\\<REDACTED:user>", redacted)
             else:
-                redacted = pattern.sub(
-                    lambda match, label=kind: self._placeholder(
-                        label,
-                        match.group(0),
-                    ),
-                    redacted,
-                )
+                replacement = partial(self._placeholder_replacement, kind)
+                redacted = pattern.sub(replacement, redacted)
         return redacted
+
+    @staticmethod
+    def _secret_replacement(match: re.Match[str]) -> str:
+        return f"{match.group(1)}=<REDACTED:secret>"
+
+    @classmethod
+    def _placeholder_replacement(cls, kind: str, match: re.Match[str]) -> str:
+        return cls._placeholder(kind, match.group(0))
 
     @staticmethod
     def _placeholder(kind: str, value: str) -> str:
