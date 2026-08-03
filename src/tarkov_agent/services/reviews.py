@@ -50,7 +50,8 @@ def review_to_markdown(raid: RaidRecord, review: RaidReview) -> str:
     route = review.route
     stats = review.statistics
     analysis = review.analysis_request
-    date = raid.started_at.date().isoformat() if raid.started_at else raid.created_at.date().isoformat()
+    raid_date = raid.started_at.date() if raid.started_at else raid.created_at.date()
+    date = raid_date.isoformat()
     map_name = review.map_name or raid.map_name or "Unknown Map"
 
     output = [f"# Tarkov Raid Review — {date} — {map_name}\n\n"]
