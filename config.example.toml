@@ -1,0 +1,42 @@
+# Copy this file to config.toml and update local paths.
+
+[paths]
+data_root = "~/TarkovPersonalAgent"
+tarkov_log_roots = []
+
+[process]
+executable_names = [
+  "EscapeFromTarkov.exe",
+  "EscapeFromTarkov_BE.exe",
+  "EscapeFromTarkovArena.exe",
+]
+poll_interval_seconds = 2.0
+
+[logs]
+file_globs = ["*.log", "*.txt"]
+poll_interval_seconds = 1.0
+start_at_end = true
+minimum_auto_signal_confidence = 0.90
+
+# Rules are intentionally empty until current Tarkov logs are collected and validated.
+# Example shape only:
+# [[logs.rules]]
+# name = "verified-raid-start"
+# pattern = "REPLACE_WITH_VERIFIED_REGEX"
+# signal = "raid_started"
+# confidence = 0.99
+
+[obs]
+enabled = false
+host = "127.0.0.1"
+port = 4455
+password = ""
+timeout_seconds = 3.0
+start_recording_on_raid_start = true
+stop_recording_on_raid_end = true
+
+[runtime]
+auto_create_raid_package = true
+auto_complete_raid_on_end = true
+copy_evidence_into_package = false
+graceful_shutdown_seconds = 10.0

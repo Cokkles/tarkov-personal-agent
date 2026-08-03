@@ -28,6 +28,7 @@ dev = [
   "pytest-cov>=5,<8",
   "ruff>=0.6,<1",
   "mypy>=1.11,<2",
+  "types-psutil>=7.0,<8",
   "httpx>=0.27,<1",
 ]
 
@@ -52,3 +53,7 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 python_version = "3.12"
 strict = true
 packages = ["tarkov_agent"]
+
+[[tool.mypy.overrides]]
+module = ["obsws_python", "obsws_python.*"]
+ignore_missing_imports = true
