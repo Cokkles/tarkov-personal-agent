@@ -151,7 +151,10 @@ def _parser() -> argparse.ArgumentParser:
     init_parser.add_argument("--force", action="store_true")
     init_parser.set_defaults(func=_command_init)
 
-    doctor_parser = subparsers.add_parser("doctor", help="Check local configuration and integrations")
+    doctor_parser = subparsers.add_parser(
+        "doctor",
+        help="Check local configuration and integrations",
+    )
     doctor_parser.add_argument("--config")
     doctor_parser.set_defaults(func=_command_doctor)
 
