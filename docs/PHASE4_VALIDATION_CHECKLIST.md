@@ -1,6 +1,6 @@
 # Phase 4 Validation Checklist
 
-This checklist is the merge gate for the Source-of-Truth implementation.
+This checklist is the merge gate for the Source-of-Truth implementation. CI must evaluate the exact feature-branch head that will be merged.
 
 - Ruff passes without exclusions added for Phase 4.
 - Strict mypy passes for all `tarkov_agent` modules.
