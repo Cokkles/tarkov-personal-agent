@@ -21,6 +21,8 @@ _POSITIVE_OUTCOME = (
     "won",
     "win",
     "opponent killed",
+    "killed",
+    "kill",
     "survived fight",
 )
 _NEGATIVE_OUTCOME = (
@@ -39,7 +41,7 @@ _PLAYER_FIRST = ("player first", "i detected", "saw first", "heard first", "me f
 _ENEMY_FIRST = ("enemy first", "opponent first", "they detected", "ambushed", "surprised")
 _MUTUAL = ("mutual", "both", "simultaneous")
 _CLOSE_RANGE = ("close", "cqb", "point blank", "short")
-_TRUE_VALUES = ("yes", "true", "player", "me", "i did")
+_TRUE_VALUES = {"yes", "true", "player", "me", "i did", "player first"}
 _PROGRESS_POSITIVE = (
     "complete",
     "completed",
@@ -61,6 +63,19 @@ def _normalize(value: str | None) -> str:
 def _contains(value: str | None, terms: tuple[str, ...]) -> bool:
     normalized = _normalize(value)
     return any(term in normalized for term in terms)
+
+
+def _is_true(value: str | None) -> bool:
+    return _normalize(value) in _TRUE_VALUES
+
+
+def _progress_direction(value: str | None) -> int:
+    normalized = _normalize(value)
+    if any(term in normalized for term in _PROGRESS_NEGATIVE):
+        return -1
+    if any(term in normalized for term in _PROGRESS_POSITIVE):
+        return 1
+    return 0
 
 
 def _evidence_id(raid_id: UUID, source_reference: str) -> UUID:
@@ -128,7 +143,8 @@ class ReviewEvidenceExtractor:
             ("primary", review.objectives.primary_progress),
             ("secondary", review.objectives.secondary_progress),
         ):
-            if _contains(progress, _PROGRESS_POSITIVE):
+            direction = _progress_direction(progress)
+            if direction > 0:
                 impacts.append(
                     _impact(
                         "objective_discipline",
@@ -142,7 +158,7 @@ class ReviewEvidenceExtractor:
                         role=EvidenceRole.DECISION,
                     )
                 )
-            elif _contains(progress, _PROGRESS_NEGATIVE):
+            elif direction < 0:
                 impacts.append(
                     _impact(
                         "objective_discipline",
@@ -283,7 +299,7 @@ class ReviewEvidenceExtractor:
                 )
             )
 
-        if _contains(encounter.fired_first, _TRUE_VALUES) and (positive or negative):
+        if _is_true(encounter.fired_first) and (positive or negative):
             impacts.append(
                 _impact(
                     "first_shot_execution",
@@ -406,7 +422,8 @@ class ReviewEvidenceExtractor:
                 )
             )
 
-        if _contains(encounter.objective_progress, _PROGRESS_POSITIVE):
+        objective_direction = _progress_direction(encounter.objective_progress)
+        if objective_direction > 0:
             impacts.append(
                 _impact(
                     "objective_discipline",
@@ -417,7 +434,7 @@ class ReviewEvidenceExtractor:
                     role=EvidenceRole.DECISION,
                 )
             )
-        elif _contains(encounter.objective_progress, _PROGRESS_NEGATIVE):
+        elif objective_direction < 0:
             impacts.append(
                 _impact(
                     "objective_discipline",
