@@ -6,11 +6,13 @@ on:
       - feature/phase4-source-of-truth
     paths:
       - ".phase4_chunks/**"
+      - ".github/workflows/phase4-expand.yml"
   pull_request:
     branches:
       - main
     paths:
       - ".phase4_chunks/**"
+      - ".github/workflows/phase4-expand.yml"
 
 permissions:
   contents: write
@@ -25,7 +27,18 @@ jobs:
       - name: Expand implementation
         shell: bash
         run: |
-          cat .phase4_chunks/* | base64 --decode > .phase4_bundle.tar.gz
+          cat \
+            .phase4_chunks/00 \
+            .phase4_chunks/01 \
+            .phase4_chunks/02 \
+            .phase4_chunks/03 \
+            .phase4_chunks/04a \
+            .phase4_chunks/04b \
+            .phase4_chunks/05 \
+            .phase4_chunks/06 \
+            .phase4_chunks/07 \
+            .phase4_chunks/08 \
+            | base64 --decode > .phase4_bundle.tar.gz
           tar -xzf .phase4_bundle.tar.gz
           rm -rf .phase4_chunks .phase4_bundle.tar.gz
           rm .github/workflows/phase4-expand.yml
