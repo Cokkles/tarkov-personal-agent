@@ -24,20 +24,25 @@ jobs:
           from pathlib import Path
 
           path = Path("src/tarkov_agent/services/source_truth.py")
-          text = path.read_text()
-          old = '''                source = sources.get(citation.source_id)
-              source_name = source.name if source is not None else "Unknown source"
-          '''
-          new = '''                citation_source = sources.get(citation.source_id)
-              source_name = (
-                  citation_source.name
-                  if citation_source is not None
-                  else "Unknown source"
-              )
-          '''
-          if old not in text:
-              raise RuntimeError("Expected citation source block was not found")
-          path.write_text(text.replace(old, new, 1))
+          lines = path.read_text().splitlines(keepends=True)
+          index = next(
+              i
+              for i, line in enumerate(lines)
+              if line.strip() == "source = sources.get(citation.source_id)"
+          )
+          if lines[index + 1].strip() != (
+              'source_name = source.name if source is not None else "Unknown source"'
+          ):
+              raise RuntimeError("Unexpected source_name line")
+          lines[index] = "                citation_source = sources.get(citation.source_id)\n"
+          lines[index + 1:index + 2] = [
+              "                source_name = (\n",
+              "                    citation_source.name\n",
+              "                    if citation_source is not None\n",
+              '                    else "Unknown source"\n',
+              "                )\n",
+          ]
+          path.write_text("".join(lines))
           PY
           rm .github/workflows/phase4-mypy-fix.yml
       - name: Commit fix
