@@ -27,7 +27,12 @@ class MarkerService:
     def deactivate(self) -> None:
         self._active_raid = None
 
-    def create(self, command: MarkerCommand, *, occurred_at: datetime | None = None) -> TimelineEvent:
+    def create(
+        self,
+        command: MarkerCommand,
+        *,
+        occurred_at: datetime | None = None,
+    ) -> TimelineEvent:
         raid = self._active_raid
         if raid is None:
             raise NoActiveRaidError("A marker cannot be created without an active raid")
