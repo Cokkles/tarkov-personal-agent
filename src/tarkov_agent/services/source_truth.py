@@ -367,38 +367,44 @@ class SourceTruthService:
         current = _aware(as_of or datetime.now(UTC))
         tasks: list[ReviewTask] = []
         for source in self._repository.list_sources(limit=10000):
-            if source.status is SourceStatus.ACTIVE and source.next_review_at is not None:
-                if _aware(source.next_review_at) <= current:
-                    tasks.append(
-                        ReviewTask(
-                            entity_type=ReviewEntityType.SOURCE,
-                            entity_id=source.id,
-                            label=source.name,
-                            due_at=_aware(source.next_review_at),
-                            severity=ReviewSeverity.IMPORTANT,
-                            reason=(
-                                "Source authority, availability, and freshness are due for "
-                                "review."
-                            ),
-                        )
+            if (
+                source.status is SourceStatus.ACTIVE
+                and source.next_review_at is not None
+                and _aware(source.next_review_at) <= current
+            ):
+                tasks.append(
+                    ReviewTask(
+                        entity_type=ReviewEntityType.SOURCE,
+                        entity_id=source.id,
+                        label=source.name,
+                        due_at=_aware(source.next_review_at),
+                        severity=ReviewSeverity.IMPORTANT,
+                        reason=(
+                            "Source authority, availability, and freshness are due for "
+                            "review."
+                        ),
                     )
+                )
         for claim in self._repository.list_claims(limit=10000):
-            if claim.status is not ClaimStatus.REJECTED and claim.next_review_at is not None:
-                if _aware(claim.next_review_at) <= current:
-                    tasks.append(
-                        ReviewTask(
-                            entity_type=ReviewEntityType.CLAIM,
-                            entity_id=claim.id,
-                            label=claim.key,
-                            due_at=_aware(claim.next_review_at),
-                            severity=(
-                                ReviewSeverity.BLOCKING
-                                if claim.status is ClaimStatus.STALE
-                                else ReviewSeverity.ROUTINE
-                            ),
-                            reason="Claim citations and patch applicability are due for review.",
-                        )
+            if (
+                claim.status is not ClaimStatus.REJECTED
+                and claim.next_review_at is not None
+                and _aware(claim.next_review_at) <= current
+            ):
+                tasks.append(
+                    ReviewTask(
+                        entity_type=ReviewEntityType.CLAIM,
+                        entity_id=claim.id,
+                        label=claim.key,
+                        due_at=_aware(claim.next_review_at),
+                        severity=(
+                            ReviewSeverity.BLOCKING
+                            if claim.status is ClaimStatus.STALE
+                            else ReviewSeverity.ROUTINE
+                        ),
+                        reason="Claim citations and patch applicability are due for review.",
                     )
+                )
         for conflict in self._repository.list_conflicts(
             status=ConflictStatus.OPEN,
             limit=10000,
