@@ -74,28 +74,39 @@ Delivered:
 
 Exit condition met: repeated raid evidence produces explainable, context-specific profile updates without treating isolated outcomes as permanent traits.
 
-## Phase 4 — Source of Truth
+## Phase 4 — Source of Truth — Complete
 
-- Source registry
-- Claim model
-- Patch applicability
-- Source ranking
-- Conflict detection
-- Scheduled review workflow
-- Citation-preserving exports
+Delivered:
 
-Exit condition: recommendations can query verified mechanics and refuse unresolved claims.
+- Source registry with authority, reliability, game scope, topics, lifecycle, and review schedule
+- Patch-aware claim model with canonical values and preserved citations
+- Inclusive introduction and exclusive removal patch windows
+- Source ranking with freshness and review penalties
+- Claim verification scores and minimum-support requirements
+- Draft, verified, disputed, stale, rejected, and refusal states
+- Automatic conflict detection for overlapping claims with different values
+- Blocking conflict and overdue review queue
+- Mechanics query contract with explicit `can_recommend` gating
+- Refusal for unknown, ambiguous, stale, unsupported, or conflicting mechanics
+- Citation-preserving Markdown and JSON exports
+- Seeded publisher, wiki, structured-data, and Scav validation records
+- Browser Source-of-Truth dashboard
+- Source-of-Truth API and CLI commands
+- SQLite migration and cross-platform automated tests
+- Full Windows setup and Scav test guide
+
+Exit condition met: recommendations can query verified mechanics and refuse unresolved claims.
 
 ## Phase 5 — Recommendation Engine
 
 - Candidate strategy generation
-- Hard mechanical constraint filtering
+- Hard mechanical constraint filtering through the Source-of-Truth query contract
 - Objective and player-fit scoring
 - Progression versus training recommendations
 - Assumption and confidence reporting
 - Experiment design
 
-Exit condition: the system produces a primary and fallback plan with traceable evidence.
+Exit condition: the system produces a primary and fallback plan with traceable mechanics and player evidence.
 
 ## Phase 6 — Media Assistance
 

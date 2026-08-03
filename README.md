@@ -11,9 +11,9 @@ The project combines four systems:
 
 ## Project status
 
-**Phase 3: Personal Playstyle Engine.**
+**Phase 4: Source of Truth.**
 
-The repository contains a runnable local companion, browser raid-review workflow, and an explainable PPE that converts finalized structured reviews into versioned global and context-specific profile estimates. Evidence weighting, recency decay, contradiction handling, per-raid caps, profile history, manual assessments, and adaptation-versus-training reports are included.
+The repository contains a runnable local companion, browser raid-review workflow, explainable PPE, and a patch-aware Source-of-Truth registry. Mechanics are stored as ranked, citation-preserving claims with patch applicability, verification scores, conflict detection, review deadlines, and an explicit query refusal contract.
 
 No Tarkov log signatures ship enabled yet. Automatic raid detection remains disabled until current redacted samples are validated against false positives. Manual lifecycle controls provide the safe fallback in the meantime.
 
@@ -38,8 +38,9 @@ tarkov-agent serve --config config.toml
 Local interfaces:
 
 ```text
-http://127.0.0.1:8765/      Raid Review
-http://127.0.0.1:8765/ppe   Personal Playstyle Engine
+http://127.0.0.1:8765/        Raid Review
+http://127.0.0.1:8765/ppe     Personal Playstyle Engine
+http://127.0.0.1:8765/truth   Source of Truth
 ```
 
 The raid-review application supports manual raid start/end controls, live markers, pending-review selection, multiple encounter records, corrected metadata, review audit history, and Markdown or JSON export. Finalizing a review updates the PPE using only explicit structured evidence.
@@ -50,13 +51,31 @@ Recalculate the profile from stored evidence:
 tarkov-agent ppe-rebuild --config config.toml
 ```
 
+Inspect and query the Source-of-Truth corpus:
+
+```powershell
+tarkov-agent truth-status --config config.toml
+tarkov-agent truth-query scav.extracted_loot_transfers --game tarkov --config config.toml
+tarkov-agent truth-review-queue --config config.toml
+```
+
 To collect a limited redacted log sample for parser research:
 
 ```powershell
-tarkov-agent capture-logs --config config.toml --seconds 180 --label pmc-survived
+tarkov-agent capture-logs --config config.toml --seconds 180 --label scav-survived
 ```
 
 Captured diagnostics must still be reviewed manually before sharing or committing.
+
+## Source-of-Truth safeguards
+
+- Only verified, applicable, conflict-free claims return `can_recommend=true`.
+- Patch-specific values require patch context when several historical values exist.
+- Unknown, draft, disputed, stale, and rejected claims are refused for recommendation use.
+- Source authority and reliability are reduced by missing or overdue review.
+- Citation URLs, locators, revisions, roles, and access times survive exports.
+- Official publisher, officially branded wiki, structured data, primary testing, and community sources remain distinct authority classes.
+- Open conflicts enter the blocking review queue.
 
 ## PPE safeguards
 
@@ -81,9 +100,11 @@ Captured diagnostics must still be reviewed manually before sharing or committin
 
 ## Repository areas
 
-- `docs/` — charter, requirements, architecture, safety, implementation notes, and roadmap
+- `docs/` — charter, requirements, architecture, safety, implementation notes, roadmap, and setup guide
 - `src/tarkov_agent/` — Python companion, local API, browser applications, and domain services
 - `src/tarkov_agent/ppe/` — profile registry, extractor, weighting engine, and report logic
+- `src/tarkov_agent/domain/source_truth.py` — patch, source, claim, citation, conflict, query, and review models
+- `src/tarkov_agent/services/source_truth.py` — ranking, verification, conflict, review, query, and export logic
 - `migrations/` — versioned SQLite migrations
 - `schemas/` — planned versioned interchange schemas
 - `prompts/` — planned recommendation prompts and output contracts
@@ -104,5 +125,7 @@ Start with:
 - [`docs/implementation/PHASE1_CORE.md`](docs/implementation/PHASE1_CORE.md)
 - [`docs/PHASE2_RAID_REVIEW.md`](docs/PHASE2_RAID_REVIEW.md)
 - [`docs/PHASE3_PERSONAL_PLAYSTYLE_ENGINE.md`](docs/PHASE3_PERSONAL_PLAYSTYLE_ENGINE.md)
+- [`docs/PHASE4_SOURCE_OF_TRUTH.md`](docs/PHASE4_SOURCE_OF_TRUTH.md)
+- [`docs/SETUP_AND_SCAV_TEST.md`](docs/SETUP_AND_SCAV_TEST.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
 - [`docs/SAFETY_AND_COMPLIANCE.md`](docs/SAFETY_AND_COMPLIANCE.md)
