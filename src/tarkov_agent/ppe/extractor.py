@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import UTC
+from datetime import UTC, datetime
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from tarkov_agent.domain.models import RaidRecord
@@ -20,8 +20,7 @@ _POSITIVE_OUTCOME = (
     "costly win",
     "won",
     "win",
-    "killed",
-    "kill",
+    "opponent killed",
     "survived fight",
 )
 _NEGATIVE_OUTCOME = (
@@ -29,11 +28,11 @@ _NEGATIVE_OUTCOME = (
     "information loss",
     "positional loss",
     "strategic loss",
+    "killed by",
     "lost",
     "loss",
     "died",
     "death",
-    "killed by",
 )
 _DISENGAGE_OUTCOME = ("disengaged", "disengage", "withdrew", "escaped", "reset")
 _PLAYER_FIRST = ("player first", "i detected", "saw first", "heard first", "me first")
@@ -88,10 +87,10 @@ def _impact(
 
 
 class ReviewEvidenceExtractor:
-    """Conservative, deterministic extraction from structured review fields.
+    """Derive conservative evidence from structured finalized review fields.
 
-    Free-text narrative fields are preserved in the review but are not interpreted as skill evidence.
-    This avoids turning ambiguous prose into confident profile changes without an explicit review step.
+    Narrative fields remain available to a human reviewer but are not interpreted as skill
+    evidence. Ambiguous prose therefore cannot silently create confident profile changes.
     """
 
     def __init__(self, registry: DimensionRegistry) -> None:
@@ -122,7 +121,7 @@ class ReviewEvidenceExtractor:
         self,
         raid: RaidRecord,
         review: RaidReview,
-        observed_at: object,
+        observed_at: datetime,
     ) -> PPEEvidence | None:
         impacts: list[DimensionImpact] = []
         for label, progress in (
@@ -134,7 +133,10 @@ class ReviewEvidenceExtractor:
                     _impact(
                         "objective_discipline",
                         0.75 if label == "primary" else 0.45,
-                        f"The structured {label} objective progress field indicates progress or completion.",
+                        (
+                            f"The structured {label} objective progress field indicates "
+                            "progress or completion."
+                        ),
                         strength=0.70 if label == "primary" else 0.45,
                         confidence=0.80,
                         role=EvidenceRole.DECISION,
@@ -145,7 +147,10 @@ class ReviewEvidenceExtractor:
                     _impact(
                         "objective_discipline",
                         -0.55 if label == "primary" else -0.25,
-                        f"The structured {label} objective progress field indicates failure or abandonment.",
+                        (
+                            f"The structured {label} objective progress field indicates "
+                            "failure or abandonment."
+                        ),
                         strength=0.60 if label == "primary" else 0.35,
                         confidence=0.70,
                         role=EvidenceRole.DECISION,
@@ -158,7 +163,10 @@ class ReviewEvidenceExtractor:
                 _impact(
                     "risk_management",
                     0.20,
-                    "The raid ended in survival or extraction; outcome-only evidence is deliberately low weight.",
+                    (
+                        "The raid ended in survival or extraction; outcome-only evidence "
+                        "is deliberately low weight."
+                    ),
                     strength=0.30,
                     confidence=0.55,
                     role=EvidenceRole.OUTCOME,
@@ -169,7 +177,10 @@ class ReviewEvidenceExtractor:
                 _impact(
                     "risk_management",
                     -0.18,
-                    "The raid ended without survival; outcome-only evidence is deliberately low weight.",
+                    (
+                        "The raid ended without survival; outcome-only evidence is "
+                        "deliberately low weight."
+                    ),
                     strength=0.25,
                     confidence=0.45,
                     role=EvidenceRole.OUTCOME,
@@ -185,7 +196,7 @@ class ReviewEvidenceExtractor:
             raid_id=raid.id,
             source=EvidenceSource.RAID_REVIEW,
             source_reference=source_reference,
-            observed_at=observed_at,  # type: ignore[arg-type]
+            observed_at=observed_at,
             reliability=0.70,
             context=self._raid_context(raid, review),
             impacts=impacts,
@@ -197,12 +208,13 @@ class ReviewEvidenceExtractor:
         raid: RaidRecord,
         review: RaidReview,
         encounter: EncounterReview,
-        observed_at: object,
+        observed_at: datetime,
     ) -> PPEEvidence | None:
         impacts: list[DimensionImpact] = []
-        positive = _contains(encounter.outcome, _POSITIVE_OUTCOME)
-        negative = _contains(encounter.outcome, _NEGATIVE_OUTCOME)
-        disengaged = _contains(encounter.outcome, _DISENGAGE_OUTCOME)
+        outcome = _normalize(encounter.outcome)
+        negative = any(term in outcome for term in _NEGATIVE_OUTCOME)
+        positive = not negative and any(term in outcome for term in _POSITIVE_OUTCOME)
+        disengaged = any(term in outcome for term in _DISENGAGE_OUTCOME)
         close_range = _contains(encounter.range_band, _CLOSE_RANGE)
         player_first = _contains(encounter.detection_order, _PLAYER_FIRST)
         enemy_first = _contains(encounter.detection_order, _ENEMY_FIRST)
@@ -229,24 +241,30 @@ class ReviewEvidenceExtractor:
                 )
             )
 
-        if close_range and (mutual or (not player_first and not enemy_first)):
-            if positive or negative:
-                impacts.append(
-                    _impact(
-                        "reactive_close_range_effectiveness",
-                        0.75 if positive else -0.75,
-                        "The outcome occurred in a mutually detected or non-prepared close-range fight.",
-                        strength=0.80,
-                        confidence=0.85,
-                    )
+        unprepared_close = mutual or (not player_first and not enemy_first)
+        if close_range and unprepared_close and (positive or negative):
+            impacts.append(
+                _impact(
+                    "reactive_close_range_effectiveness",
+                    0.75 if positive else -0.75,
+                    (
+                        "The outcome occurred in a mutually detected or non-prepared "
+                        "close-range fight."
+                    ),
+                    strength=0.80,
+                    confidence=0.85,
                 )
+            )
 
         if player_first and (positive or negative):
             impacts.append(
                 _impact(
                     "prepared_engagement_effectiveness",
                     0.65 if positive else -0.60,
-                    "The player detected the opponent first, creating a prepared-engagement opportunity.",
+                    (
+                        "The player detected first, creating a prepared-engagement "
+                        "opportunity."
+                    ),
                     strength=0.65,
                     confidence=0.80,
                 )
@@ -256,7 +274,10 @@ class ReviewEvidenceExtractor:
                 _impact(
                     "pressure_stability",
                     0.55 if positive else -0.55,
-                    "The opponent detected first, so the result provides limited evidence about response under pressure.",
+                    (
+                        "The opponent detected first, providing limited evidence about "
+                        "response under pressure."
+                    ),
                     strength=0.55,
                     confidence=0.70,
                 )
@@ -267,7 +288,10 @@ class ReviewEvidenceExtractor:
                 _impact(
                     "first_shot_execution",
                     0.65 if positive else -0.55,
-                    "The player fired first; the outcome indicates whether that opening was converted.",
+                    (
+                        "The player fired first; the outcome indicates whether the opening "
+                        "was converted."
+                    ),
                     strength=0.60,
                     confidence=0.75,
                 )
@@ -289,7 +313,7 @@ class ReviewEvidenceExtractor:
                 _impact(
                     "repositioning",
                     -0.35,
-                    "The player remained static during an encounter that ended negatively.",
+                    "The player remained static during a negative encounter.",
                     strength=0.40,
                     confidence=0.60,
                     role=EvidenceRole.DECISION,
@@ -312,7 +336,10 @@ class ReviewEvidenceExtractor:
                 _impact(
                     "angle_discipline",
                     0.25,
-                    "The encounter records that the player did not repeat the same angle during a win.",
+                    (
+                        "The encounter records that the player did not repeat the same "
+                        "angle during a win."
+                    ),
                     strength=0.30,
                     confidence=0.60,
                     role=EvidenceRole.DECISION,
@@ -324,7 +351,10 @@ class ReviewEvidenceExtractor:
                 _impact(
                     "overcommitment_control",
                     -0.75,
-                    "The review states that disengagement was available, but the encounter ended negatively.",
+                    (
+                        "Disengagement was available, but the encounter still ended "
+                        "negatively."
+                    ),
                     strength=0.75,
                     confidence=0.85,
                     role=EvidenceRole.DECISION,
@@ -409,7 +439,7 @@ class ReviewEvidenceExtractor:
             encounter_id=encounter.id,
             source=EvidenceSource.ENCOUNTER_REVIEW,
             source_reference=source_reference,
-            observed_at=observed_at,  # type: ignore[arg-type]
+            observed_at=observed_at,
             reliability=0.88,
             context=PPEContext(
                 game=raid.game.value,
