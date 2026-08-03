@@ -1,0 +1,34 @@
+name: Expand Phase 4 bundle
+
+on:
+  push:
+    branches:
+      - feature/phase4-source-of-truth
+    paths:
+      - ".phase4_chunks/**"
+
+permissions:
+  contents: write
+
+jobs:
+  expand:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/phase4-source-of-truth
+      - name: Expand implementation
+        shell: bash
+        run: |
+          cat .phase4_chunks/* | base64 --decode > .phase4_bundle.tar.gz
+          tar -xzf .phase4_bundle.tar.gz
+          rm -rf .phase4_chunks .phase4_bundle.tar.gz
+          rm .github/workflows/phase4-expand.yml
+      - name: Commit implementation
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Implement Phase 4 Source of Truth"
+          git push origin HEAD:feature/phase4-source-of-truth
