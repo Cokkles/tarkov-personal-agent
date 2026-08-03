@@ -1,0 +1,75 @@
+name: Apply Phase 4 SIM102 fixes
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/phase4-sim102-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/phase4-source-of-truth
+      - name: Collapse review queue conditions
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/tarkov_agent/services/source_truth.py")
+          lines = path.read_text().splitlines(keepends=True)
+
+          def collapse(outer: str, inner: str, replacement: list[str]) -> None:
+              nonlocal_lines = lines
+              index = next(i for i, line in enumerate(nonlocal_lines) if line.strip() == outer)
+              if nonlocal_lines[index + 1].strip() != inner:
+                  raise RuntimeError(f"Unexpected nested condition after {outer!r}")
+              end = index + 2
+              while end < len(nonlocal_lines):
+                  line = nonlocal_lines[end]
+                  if line.strip() and len(line) - len(line.lstrip()) <= 12:
+                      break
+                  end += 1
+              body = [line[4:] if line.startswith("    ") else line for line in nonlocal_lines[index + 2:end]]
+              nonlocal_lines[index:end] = replacement + body
+
+          collapse(
+              "if source.status is SourceStatus.ACTIVE and source.next_review_at is not None:",
+              "if _aware(source.next_review_at) <= current:",
+              [
+                  "            if (\n",
+                  "                source.status is SourceStatus.ACTIVE\n",
+                  "                and source.next_review_at is not None\n",
+                  "                and _aware(source.next_review_at) <= current\n",
+                  "            ):\n",
+              ],
+          )
+          collapse(
+              "if claim.status is not ClaimStatus.REJECTED and claim.next_review_at is not None:",
+              "if _aware(claim.next_review_at) <= current:",
+              [
+                  "            if (\n",
+                  "                claim.status is not ClaimStatus.REJECTED\n",
+                  "                and claim.next_review_at is not None\n",
+                  "                and _aware(claim.next_review_at) <= current\n",
+                  "            ):\n",
+              ],
+          )
+          path.write_text("".join(lines))
+          PY
+          rm .github/workflows/phase4-sim102-fix.yml
+      - name: Commit fixes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Collapse Phase 4 review queue conditions"
+          git push origin HEAD:feature/phase4-source-of-truth
