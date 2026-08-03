@@ -52,3 +52,7 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 python_version = "3.12"
 strict = true
 packages = ["tarkov_agent"]
+
+[[tool.mypy.overrides]]
+module = ["obsws_python", "obsws_python.*"]
+ignore_missing_imports = true
