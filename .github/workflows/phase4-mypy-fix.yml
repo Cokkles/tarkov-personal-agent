@@ -1,0 +1,50 @@
+name: Apply Phase 4 mypy fix
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/phase4-mypy-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/phase4-source-of-truth
+      - name: Rename optional citation source
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/tarkov_agent/services/source_truth.py")
+          text = path.read_text()
+          old = '''                source = sources.get(citation.source_id)
+              source_name = source.name if source is not None else "Unknown source"
+          '''
+          new = '''                citation_source = sources.get(citation.source_id)
+              source_name = (
+                  citation_source.name
+                  if citation_source is not None
+                  else "Unknown source"
+              )
+          '''
+          if old not in text:
+              raise RuntimeError("Expected citation source block was not found")
+          path.write_text(text.replace(old, new, 1))
+          PY
+          rm .github/workflows/phase4-mypy-fix.yml
+      - name: Commit fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Fix Phase 4 citation source typing"
+          git push origin HEAD:feature/phase4-source-of-truth
