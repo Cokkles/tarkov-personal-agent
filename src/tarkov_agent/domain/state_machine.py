@@ -76,7 +76,8 @@ class RaidLifecycle:
         try:
             next_state = _TRANSITIONS[key]
         except KeyError as exc:
-            raise InvalidTransition(f"Cannot apply {signal} while lifecycle is {self.state}") from exc
+            message = f"Cannot apply {signal} while lifecycle is {self.state}"
+            raise InvalidTransition(message) from exc
 
         transition = StateTransition(
             from_state=self.state,
