@@ -10,6 +10,7 @@ from tarkov_agent.services.control import ManualControlService
 from tarkov_agent.services.coordinator import RaidCoordinator
 from tarkov_agent.services.markers import MarkerService
 from tarkov_agent.services.packages import RaidPackageBuilder
+from tarkov_agent.services.ppe import PPEProfileService
 from tarkov_agent.services.recovery import RecoveryService
 from tarkov_agent.services.reviews import RaidReviewService
 from tarkov_agent.storage.database import RaidRepository
@@ -25,6 +26,7 @@ class AgentContext:
     coordinator: RaidCoordinator
     runtime: CompanionRuntime
     reviews: RaidReviewService
+    ppe: PPEProfileService
     recovery: RecoveryService
     controls: ManualControlService
 
@@ -50,6 +52,7 @@ def build_context(settings: AppSettings) -> AgentContext:
     coordinator = RaidCoordinator(settings, repository, packages, markers, recording)
     runtime = CompanionRuntime(settings, coordinator)
     reviews = RaidReviewService(repository, packages)
+    ppe = PPEProfileService(repository, settings.paths.ppe_root, settings.ppe)
     recovery = RecoveryService(repository, packages)
     controls = ManualControlService(settings, coordinator, markers, repository, packages)
     return AgentContext(
@@ -61,6 +64,7 @@ def build_context(settings: AppSettings) -> AgentContext:
         coordinator=coordinator,
         runtime=runtime,
         reviews=reviews,
+        ppe=ppe,
         recovery=recovery,
         controls=controls,
     )
