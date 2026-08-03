@@ -69,7 +69,7 @@ def attach_source_truth_routes(app: FastAPI, context: AgentContext) -> None:
     @app.get("/api/truth/claims", response_model=list[ClaimRecord])
     async def source_truth_claims(
         key: str | None = Query(default=None, max_length=180),
-        status: ClaimStatus | None = Query(default=None),
+        status: ClaimStatus | None = None,
         limit: int = Query(default=5000, ge=1, le=10000),
     ) -> list[ClaimRecord]:
         return context.truth.claims(key=key, status=status, limit=limit)
