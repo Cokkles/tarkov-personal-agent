@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+config.local.toml
+secrets/
+
+# Runtime data
+*.db
+*.sqlite
+*.sqlite3
+data/
+raid-data/
+recordings/
+screenshots/
+logs/
+exports/
+
+# Media
+*.mkv
+*.mp4
+*.mov
+*.avi
+*.webm
+*.wav
+*.flac
+
+# Generated builds
+build/
+dist/
+*.egg-info/
