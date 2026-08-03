@@ -1,8 +1,8 @@
 # Roadmap
 
-## Phase 0 — Foundation
+## Phase 0 — Foundation — Complete
 
-Deliverables:
+Delivered:
 
 - Project charter and scope
 - Safety boundary
@@ -13,46 +13,58 @@ Deliverables:
 - Initial risk register
 - Test strategy
 
-Exit condition: the MVP can be implemented without unresolved architectural dependencies.
+Exit condition met: the MVP implementation proceeded without unresolved architectural dependencies.
 
-## Phase 1 — Raid Companion MVP
+## Phase 1 — Raid Companion MVP — Complete
 
-- Configuration loader
-- Process observer
-- Filesystem/log watcher
-- Raid state machine
+Delivered:
+
+- Typed configuration loader
+- Passive process observer
+- Rotation-tolerant filesystem/log observer
+- Deterministic raid state machine
 - OBS WebSocket adapter
-- Raid package creation
+- Recoverable raid package creation
 - Manual semantic markers
-- SQLite persistence
-- Recovery after application or game crash
+- SQLite persistence and migrations
 - CLI status and diagnostic commands
+- Cross-platform automated tests
 
-Exit condition: a local test session can create a recoverable raid package and control a mocked or real OBS instance.
+Exit condition met: local test sessions can create recoverable raid packages and control mocked or real OBS instances.
 
-## Phase 2 — Raid Review
+## Phase 2 — Raid Review — Complete
+
+Delivered:
 
 - Local FastAPI service
 - Browser review form
+- Manual raid start, end, and abort fallback controls
 - Prefilled raid metadata
 - Multiple encounter records
-- Screenshot and recording references
+- Controlled screenshot and recording references
 - Markdown and JSON export
-- Corrections and audit history
+- Versioned corrections and audit history
+- Post-raid review queue
+- Interrupted-session recovery
+- Privacy-aware diagnostic log capture
+- Loopback-first API security and token requirement for non-loopback binding
 
-Exit condition: a completed raid can be reviewed and exported without manually rebuilding its metadata.
+Exit condition met: a completed raid can be queued, reviewed, corrected, finalized, and exported without manually rebuilding its metadata.
 
 ## Phase 3 — Personal Playstyle Engine
 
 - Profile dimension registry
-- Evidence weighting
-- Context segmentation
+- Evidence weighting and source reliability
+- Context segmentation by map, objective, range, loadout, group size, and raid state
 - Encounter classification
+- Decision-point and outcome records
 - Contradiction handling
 - Confidence and decay rules
+- Player adaptation versus deliberate training recommendations
 - Profile history and comparison reports
+- Explainable profile-update audit trail
 
-Exit condition: repeated raid evidence produces explainable, context-specific profile updates.
+Exit condition: repeated raid evidence produces explainable, context-specific profile updates without treating isolated outcomes as permanent traits.
 
 ## Phase 4 — Source of Truth
 
@@ -95,6 +107,16 @@ Computer vision and OCR remain optional and must not become prerequisites for co
 - Mechanical practice reports
 - Squad-role context
 - Team communication markers
+
+## Parallel validation track — Tarkov log signatures
+
+This track remains deliberately separate from feature phases:
+
+- Collect redacted PMC, Scav, Arena, death, extract, disconnect, reconnect, and crash samples
+- Compare start/end candidates across patches
+- Test false positives against launcher, menus, Hideout, matchmaking, and cancellation
+- Version parser rules and fixtures
+- Keep manual controls available even after automatic rules are enabled
 
 ## Deferred
 

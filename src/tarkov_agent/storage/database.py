@@ -4,10 +4,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, create_engine, select
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, create_engine, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
-from tarkov_agent.domain.models import RaidRecord, TimelineEvent
+from tarkov_agent.domain.models import RaidRecord, RaidState, TimelineEvent
+from tarkov_agent.domain.reviews import RaidReview, ReviewAuditEntry
 
 
 class Base(DeclarativeBase):
@@ -38,8 +39,33 @@ class TimelineEventRow(Base):
     document_json: Mapped[str] = mapped_column(Text)
 
 
+class RaidReviewRow(Base):
+    __tablename__ = "raid_reviews"
+
+    raid_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("raids.id", ondelete="CASCADE"), primary_key=True
+    )
+    version: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(40), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    document_json: Mapped[str] = mapped_column(Text)
+
+
+class ReviewAuditRow(Base):
+    __tablename__ = "review_audit"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    raid_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("raids.id", ondelete="CASCADE"), index=True
+    )
+    version: Mapped[int] = mapped_column(Integer, index=True)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    action: Mapped[str] = mapped_column(String(80), index=True)
+    document_json: Mapped[str] = mapped_column(Text)
+
+
 class RaidRepository:
-    """SQLite-backed document repository with indexed raid and timeline fields."""
+    """SQLite-backed document repository with indexed query fields."""
 
     def __init__(self, database_path: Path | str) -> None:
         path = Path(database_path).expanduser().resolve()
@@ -83,6 +109,24 @@ class RaidRepository:
             rows = session.scalars(statement).all()
             return [RaidRecord.model_validate_json(row.document_json) for row in rows]
 
+    def list_raids_by_states(
+        self,
+        states: set[RaidState],
+        *,
+        limit: int = 100,
+    ) -> list[RaidRecord]:
+        if not states:
+            return []
+        statement = (
+            select(RaidRow)
+            .where(RaidRow.state.in_([state.value for state in states]))
+            .order_by(RaidRow.created_at.desc())
+            .limit(limit)
+        )
+        with Session(self._engine) as session:
+            rows = session.scalars(statement).all()
+            return [RaidRecord.model_validate_json(row.document_json) for row in rows]
+
     def add_timeline_event(self, event: TimelineEvent) -> None:
         with Session(self._engine) as session:
             session.merge(
@@ -106,3 +150,53 @@ class RaidRepository:
         with Session(self._engine) as session:
             rows = session.scalars(statement).all()
             return [TimelineEvent.model_validate_json(row.document_json) for row in rows]
+
+    def save_review(self, review: RaidReview) -> None:
+        with Session(self._engine) as session:
+            row = session.get(RaidReviewRow, str(review.raid_id))
+            if row is None:
+                row = RaidReviewRow(
+                    raid_id=str(review.raid_id),
+                    version=review.version,
+                    status=review.status.value,
+                    updated_at=review.updated_at,
+                    document_json=review.model_dump_json(),
+                )
+                session.add(row)
+            else:
+                row.version = review.version
+                row.status = review.status.value
+                row.updated_at = review.updated_at
+                row.document_json = review.model_dump_json()
+            session.commit()
+
+    def get_review(self, raid_id: UUID | str) -> RaidReview | None:
+        with Session(self._engine) as session:
+            row = session.get(RaidReviewRow, str(raid_id))
+            if row is None:
+                return None
+            return RaidReview.model_validate_json(row.document_json)
+
+    def add_review_audit(self, entry: ReviewAuditEntry) -> None:
+        with Session(self._engine) as session:
+            session.add(
+                ReviewAuditRow(
+                    id=str(entry.id),
+                    raid_id=str(entry.raid_id),
+                    version=entry.version,
+                    changed_at=entry.changed_at,
+                    action=entry.action,
+                    document_json=entry.model_dump_json(),
+                )
+            )
+            session.commit()
+
+    def list_review_audits(self, raid_id: UUID | str) -> list[ReviewAuditEntry]:
+        statement = (
+            select(ReviewAuditRow)
+            .where(ReviewAuditRow.raid_id == str(raid_id))
+            .order_by(ReviewAuditRow.version.asc(), ReviewAuditRow.changed_at.asc())
+        )
+        with Session(self._engine) as session:
+            rows = session.scalars(statement).all()
+            return [ReviewAuditEntry.model_validate_json(row.document_json) for row in rows]

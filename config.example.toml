@@ -18,8 +18,7 @@ poll_interval_seconds = 1.0
 start_at_end = true
 minimum_auto_signal_confidence = 0.90
 
-# Rules are intentionally empty until current Tarkov logs are collected and validated.
-# Example shape only:
+# Rules remain empty until current Tarkov logs are collected and validated.
 # [[logs.rules]]
 # name = "verified-raid-start"
 # pattern = "REPLACE_WITH_VERIFIED_REGEX"
@@ -35,8 +34,21 @@ timeout_seconds = 3.0
 start_recording_on_raid_start = true
 stop_recording_on_raid_end = true
 
+[api]
+enabled = true
+host = "127.0.0.1"
+port = 8765
+token = ""
+open_browser = true
+allowed_evidence_roots = []
+
+[diagnostics]
+default_capture_seconds = 120.0
+maximum_lines = 10000
+
 [runtime]
 auto_create_raid_package = true
-auto_complete_raid_on_end = true
+auto_complete_raid_on_end = false
 copy_evidence_into_package = false
+recover_interrupted_sessions = true
 graceful_shutdown_seconds = 10.0

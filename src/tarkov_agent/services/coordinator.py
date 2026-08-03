@@ -5,7 +5,13 @@ from pathlib import Path
 from typing import Any
 
 from tarkov_agent.config import AppSettings
-from tarkov_agent.domain.models import EvidenceKind, RaidRecord, RaidState, TimelineEvent
+from tarkov_agent.domain.models import (
+    EvidenceKind,
+    Game,
+    RaidRecord,
+    RaidState,
+    TimelineEvent,
+)
 from tarkov_agent.domain.state_machine import RaidLifecycle, RaidSignal, StateTransition
 from tarkov_agent.integrations.obs import ObsIntegrationError, RecordingController
 from tarkov_agent.observers.process import ProcessSnapshot
@@ -32,6 +38,13 @@ class RaidCoordinator:
         self.recording = recording
         self.lifecycle = RaidLifecycle()
         self.active_raid: RaidRecord | None = None
+
+    def restore_active_raid(self, raid: RaidRecord) -> None:
+        if raid.state is not RaidState.IN_RAID:
+            raise ValueError("Only an in-raid record can be restored as active")
+        self.lifecycle = RaidLifecycle(state=raid.state)
+        self.active_raid = raid
+        self.markers.activate(raid)
 
     def handle_process_snapshot(self, snapshot: ProcessSnapshot) -> StateTransition | None:
         if snapshot.running and self.lifecycle.can_apply(RaidSignal.GAME_FOUND):
@@ -63,7 +76,7 @@ class RaidCoordinator:
         if signal is RaidSignal.RAID_STARTED:
             self._start_raid(timestamp, details, transition)
         elif signal is RaidSignal.RAID_ENDED:
-            self._end_raid(timestamp, transition)
+            self._end_raid(timestamp, details, transition)
             if self.settings.runtime.auto_complete_raid_on_end:
                 completion = self.lifecycle.apply(
                     RaidSignal.REVIEW_COMPLETED,
@@ -71,6 +84,13 @@ class RaidCoordinator:
                     reason="Headless runtime auto-completed post-raid review",
                 )
                 self._complete_review(completion)
+            else:
+                pending = self.lifecycle.apply(
+                    RaidSignal.REVIEW_REQUIRED,
+                    occurred_at=timestamp,
+                    reason="Raid ended and requires post-raid review",
+                )
+                self._queue_review(pending)
         elif signal is RaidSignal.REVIEW_COMPLETED:
             self._complete_review(transition)
         elif signal in {RaidSignal.ABORT, RaidSignal.GAME_LOST} and self.active_raid is not None:
@@ -90,6 +110,7 @@ class RaidCoordinator:
             raise RuntimeError("Cannot start a new raid while another raid is active")
 
         raid = RaidRecord(
+            game=self._game(payload.get("game")),
             state=transition.to_state,
             started_at=timestamp,
             map_name=self._optional_text(payload.get("map_name")),
@@ -122,12 +143,19 @@ class RaidCoordinator:
                     "OBS recording could not be started",
                     timestamp,
                     {"error": str(exc)},
-                    confidence=1.0,
                 )
 
-    def _end_raid(self, timestamp: datetime, transition: StateTransition) -> None:
+    def _end_raid(
+        self,
+        timestamp: datetime,
+        payload: dict[str, Any],
+        transition: StateTransition,
+    ) -> None:
         raid = self._require_active_raid()
-        raid = raid.model_copy(update={"state": transition.to_state, "ended_at": timestamp})
+        result = self._optional_text(payload.get("result")) or raid.result
+        raid = raid.model_copy(
+            update={"state": transition.to_state, "ended_at": timestamp, "result": result}
+        )
         self.active_raid = raid
         self.markers.activate(raid)
         self._append_transition_event(raid, transition)
@@ -165,6 +193,20 @@ class RaidCoordinator:
 
         self._persist_active()
 
+    def _queue_review(self, transition: StateTransition) -> None:
+        raid = self._require_active_raid().model_copy(update={"state": transition.to_state})
+        self.active_raid = raid
+        self._append_transition_event(raid, transition)
+        self._persist_active()
+        self.markers.deactivate()
+        self.active_raid = None
+        if self.lifecycle.can_apply(RaidSignal.RESET):
+            self.lifecycle.apply(
+                RaidSignal.RESET,
+                occurred_at=transition.occurred_at,
+                reason="Runtime reset after queuing raid review",
+            )
+
     def _complete_review(self, transition: StateTransition) -> None:
         raid = self._require_active_raid()
         raid = raid.model_copy(update={"state": transition.to_state})
@@ -173,6 +215,12 @@ class RaidCoordinator:
         self._persist_active()
         self.markers.deactivate()
         self.active_raid = None
+        if self.lifecycle.can_apply(RaidSignal.RESET):
+            self.lifecycle.apply(
+                RaidSignal.RESET,
+                occurred_at=transition.occurred_at,
+                reason="Runtime reset after completing raid review",
+            )
 
     def _abort_or_interrupt(self, timestamp: datetime, transition: StateTransition) -> None:
         raid = self._require_active_raid()
@@ -262,3 +310,10 @@ class RaidCoordinator:
             return None
         text = str(value).strip()
         return text or None
+
+    @staticmethod
+    def _game(value: Any) -> Game:
+        try:
+            return Game(str(value)) if value is not None else Game.TARKOV
+        except ValueError:
+            return Game.TARKOV
