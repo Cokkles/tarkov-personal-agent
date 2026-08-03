@@ -14,9 +14,18 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 
 from tarkov_agent.app_context import AgentContext
 from tarkov_agent.domain.models import EvidenceKind, Game, MarkerCommand, RaidRecord
+from tarkov_agent.domain.ppe import (
+    DimensionDefinition,
+    ManualEvidenceRequest,
+    PPEEvidence,
+    ProfileAuditEntry,
+    ProfileReport,
+    ProfileSnapshot,
+)
 from tarkov_agent.domain.reviews import RaidReview
 from tarkov_agent.services.control import ControlConflictError, EvidencePathError
 from tarkov_agent.services.markers import NoActiveRaidError
+from tarkov_agent.services.ppe import PPEDisabledError, PPEValidationError
 from tarkov_agent.services.reviews import ReviewConflictError, ReviewNotFoundError
 
 
@@ -70,6 +79,11 @@ class EvidenceReferenceRequest(BaseModel):
     copy_into_package: bool = False
 
 
+class PPERebuildRequest(BaseModel):
+    force: bool = False
+    trigger: str = Field(default="api-rebuild", min_length=1, max_length=240)
+
+
 def create_app(context: AgentContext, *, start_runtime: bool = True) -> FastAPI:
     runtime_task: asyncio.Task[None] | None = None
 
@@ -98,7 +112,7 @@ def create_app(context: AgentContext, *, start_runtime: bool = True) -> FastAPI:
 
     app = FastAPI(
         title="Tarkov Personal Agent",
-        version="0.2.0",
+        version="0.3.0",
         lifespan=lifespan,
     )
     app.add_middleware(TokenAuthMiddleware, token=context.settings.api.token)
@@ -107,20 +121,27 @@ def create_app(context: AgentContext, *, start_runtime: bool = True) -> FastAPI:
     async def index() -> FileResponse:
         return FileResponse(Path(__file__).parent / "static" / "index.html")
 
+    @app.get("/ppe", response_class=HTMLResponse, include_in_schema=False)
+    async def ppe_index() -> FileResponse:
+        return FileResponse(Path(__file__).parent / "static" / "ppe.html")
+
     @app.get("/api/health")
     async def health() -> dict[str, object]:
-        return {"ok": True, "version": "0.2.0"}
+        return {"ok": True, "version": "0.3.0"}
 
     @app.get("/api/status")
     async def agent_status() -> dict[str, object]:
         active = context.coordinator.active_raid
         queue = context.recovery.pending(limit=100)
+        profile = context.ppe.current()
         return {
             "lifecycle_state": context.coordinator.lifecycle.state.value,
             "active_raid": active,
             "review_queue_count": len(queue),
             "automatic_log_rules": len(context.settings.logs.rules),
             "obs_enabled": context.settings.obs.enabled,
+            "ppe_enabled": context.settings.ppe.enabled,
+            "ppe_profile_version": profile.version if profile is not None else None,
         }
 
     @app.get("/api/raids", response_model=list[RaidRecord])
@@ -144,6 +165,7 @@ def create_app(context: AgentContext, *, start_runtime: bool = True) -> FastAPI:
             "raid": raid,
             "timeline": context.repository.list_timeline_events(raid_id),
             "review": context.reviews.get_or_create(raid_id),
+            "ppe_evidence": context.ppe.evidence_for_raid(raid_id),
         }
 
     @app.get("/api/raids/{raid_id}/timeline")
@@ -182,16 +204,23 @@ def create_app(context: AgentContext, *, start_runtime: bool = True) -> FastAPI:
         request: ReviewUpdateRequest,
     ) -> RaidReview:
         try:
-            return context.reviews.finalize(
+            finalized = context.reviews.finalize(
                 raid_id,
                 request.review,
                 expected_version=request.expected_version,
                 actor=request.actor,
             )
+            raid = context.repository.get_raid(raid_id)
+            if raid is None:
+                raise ReviewNotFoundError(f"Raid not found after finalization: {raid_id}")
+            context.ppe.ingest_finalized_review(raid, finalized)
+            return finalized
         except ReviewNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except ReviewConflictError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except PPEValidationError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.get("/api/raids/{raid_id}/review/audit")
     async def review_audit(raid_id: str) -> list[object]:
@@ -273,5 +302,97 @@ def create_app(context: AgentContext, *, start_runtime: bool = True) -> FastAPI:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except EvidencePathError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/api/ppe/dimensions", response_model=list[DimensionDefinition])
+    async def ppe_dimensions() -> list[DimensionDefinition]:
+        return context.ppe.dimensions()
+
+    @app.get("/api/ppe/profile", response_model=ProfileSnapshot)
+    async def ppe_profile() -> ProfileSnapshot:
+        try:
+            return context.ppe.current_or_build()
+        except PPEDisabledError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    @app.get("/api/ppe/profile/history", response_model=list[ProfileSnapshot])
+    async def ppe_profile_history(
+        limit: int = Query(default=100, ge=1, le=1000),
+    ) -> list[ProfileSnapshot]:
+        return context.ppe.history(limit=limit)
+
+    @app.get("/api/ppe/profile/audit", response_model=list[ProfileAuditEntry])
+    async def ppe_profile_audit(
+        limit: int = Query(default=100, ge=1, le=1000),
+    ) -> list[ProfileAuditEntry]:
+        return context.ppe.audit_history(limit=limit)
+
+    @app.get("/api/ppe/evidence", response_model=list[PPEEvidence])
+    async def ppe_evidence(
+        limit: int | None = Query(default=None, ge=1, le=10000),
+    ) -> list[PPEEvidence]:
+        return context.ppe.evidence(limit=limit)
+
+    @app.get("/api/ppe/raids/{raid_id}/evidence", response_model=list[PPEEvidence])
+    async def ppe_raid_evidence(raid_id: str) -> list[PPEEvidence]:
+        if context.repository.get_raid(raid_id) is None:
+            raise HTTPException(status_code=404, detail="Raid not found")
+        return context.ppe.evidence_for_raid(raid_id)
+
+    @app.post("/api/ppe/evidence/manual")
+    async def add_manual_ppe_evidence(
+        request: ManualEvidenceRequest,
+    ) -> dict[str, object]:
+        try:
+            evidence, profile = context.ppe.add_manual_evidence(request)
+            return {"evidence": evidence, "profile": profile}
+        except PPEDisabledError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except PPEValidationError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.post("/api/ppe/rebuild", response_model=ProfileSnapshot)
+    async def rebuild_ppe(request: PPERebuildRequest) -> ProfileSnapshot:
+        try:
+            return context.ppe.rebuild(
+                trigger=request.trigger,
+                force=request.force,
+            ).snapshot
+        except PPEDisabledError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.get("/api/ppe/report", response_model=ProfileReport)
+    async def ppe_report() -> ProfileReport:
+        try:
+            return context.ppe.report()
+        except PPEDisabledError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    @app.get("/api/ppe/export/{format_name}")
+    async def export_ppe(format_name: str) -> Response:
+        try:
+            if format_name == "markdown":
+                return Response(
+                    content=context.ppe.report_markdown(),
+                    media_type="text/markdown",
+                    headers={
+                        "Content-Disposition": 'attachment; filename="ppe-profile.md"'
+                    },
+                )
+            if format_name == "json":
+                return Response(
+                    content=context.ppe.report().model_dump_json(indent=2),
+                    media_type="application/json",
+                    headers={
+                        "Content-Disposition": 'attachment; filename="ppe-profile.json"'
+                    },
+                )
+        except PPEDisabledError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=404,
+            detail="Export format must be markdown or json",
+        )
 
     return app

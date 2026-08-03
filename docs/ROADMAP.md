@@ -51,20 +51,28 @@ Delivered:
 
 Exit condition met: a completed raid can be queued, reviewed, corrected, finalized, and exported without manually rebuilding its metadata.
 
-## Phase 3 — Personal Playstyle Engine
+## Phase 3 — Personal Playstyle Engine — Complete
 
-- Profile dimension registry
-- Evidence weighting and source reliability
-- Context segmentation by map, objective, range, loadout, group size, and raid state
-- Encounter classification
-- Decision-point and outcome records
-- Contradiction handling
-- Confidence and decay rules
-- Player adaptation versus deliberate training recommendations
-- Profile history and comparison reports
-- Explainable profile-update audit trail
+Delivered:
 
-Exit condition: repeated raid evidence produces explainable, context-specific profile updates without treating isolated outcomes as permanent traits.
+- Versioned profile-dimension registry
+- Explicit evidence roles, source reliability, strength, confidence, and rationale
+- Conservative extraction from finalized structured raid reviews
+- Global and context-specific profile estimates
+- Per-raid evidence caps to prevent one raid from dominating a dimension
+- Neutral priors and recency half-life decay
+- Contradiction detection and confidence reduction
+- Independent raid counts and supporting evidence references
+- Immutable profile snapshots and profile-update audit history
+- Evidence-corpus fingerprints and idempotent rebuilds
+- Manual evidence workflow with dimension validation
+- Adaptation guidance separated from optional deliberate training
+- Browser PPE dashboard
+- PPE API and CLI rebuild command
+- Per-raid PPE evidence and profile-impact exports
+- Cross-platform automated tests
+
+Exit condition met: repeated raid evidence produces explainable, context-specific profile updates without treating isolated outcomes as permanent traits.
 
 ## Phase 4 — Source of Truth
 

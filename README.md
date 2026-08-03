@@ -11,9 +11,9 @@ The project combines four systems:
 
 ## Project status
 
-**Phase 2: local raid capture and review workflow.**
+**Phase 3: Personal Playstyle Engine.**
 
-The repository contains a runnable local companion with typed configuration, passive process and log observers, a raid lifecycle state machine, OBS recording control, recoverable raid packages, SQLite persistence, semantic markers, diagnostic log capture, manual controls, a local FastAPI service, and a browser-based post-raid review queue.
+The repository contains a runnable local companion, browser raid-review workflow, and an explainable PPE that converts finalized structured reviews into versioned global and context-specific profile estimates. Evidence weighting, recency decay, contradiction handling, per-raid caps, profile history, manual assessments, and adaptation-versus-training reports are included.
 
 No Tarkov log signatures ship enabled yet. Automatic raid detection remains disabled until current redacted samples are validated against false positives. Manual lifecycle controls provide the safe fallback in the meantime.
 
@@ -29,19 +29,26 @@ tarkov-agent init --output config.toml
 tarkov-agent doctor --config config.toml
 ```
 
-After configuring OBS WebSocket and any local log paths, launch the companion and browser review application:
+After configuring OBS WebSocket and any local log paths, launch the companion:
 
 ```powershell
 tarkov-agent serve --config config.toml
 ```
 
-The default local address is:
+Local interfaces:
 
 ```text
-http://127.0.0.1:8765/
+http://127.0.0.1:8765/      Raid Review
+http://127.0.0.1:8765/ppe   Personal Playstyle Engine
 ```
 
-The review application supports manual raid start/end controls, live markers, pending-review selection, multiple encounter records, corrected metadata, review audit history, and Markdown or JSON export.
+The raid-review application supports manual raid start/end controls, live markers, pending-review selection, multiple encounter records, corrected metadata, review audit history, and Markdown or JSON export. Finalizing a review updates the PPE using only explicit structured evidence.
+
+Recalculate the profile from stored evidence:
+
+```powershell
+tarkov-agent ppe-rebuild --config config.toml
+```
 
 To collect a limited redacted log sample for parser research:
 
@@ -50,6 +57,17 @@ tarkov-agent capture-logs --config config.toml --seconds 180 --label pmc-survive
 ```
 
 Captured diagnostics must still be reviewed manually before sharing or committing.
+
+## PPE safeguards
+
+- A single raid cannot dominate a dimension.
+- Outcome-only evidence is deliberately low weight.
+- Older evidence decays gradually.
+- Contradictory evidence lowers confidence.
+- Global and contextual estimates coexist.
+- Free-text raid narratives are not silently converted into skill claims.
+- Adaptation guidance is separate from optional deliberate training.
+- Every changed profile has a version, evidence fingerprint, and audit record.
 
 ## Core principles
 
@@ -64,10 +82,11 @@ Captured diagnostics must still be reviewed manually before sharing or committin
 ## Repository areas
 
 - `docs/` — charter, requirements, architecture, safety, implementation notes, and roadmap
-- `src/tarkov_agent/` — Python companion, local API, browser review application, and domain services
+- `src/tarkov_agent/` — Python companion, local API, browser applications, and domain services
+- `src/tarkov_agent/ppe/` — profile registry, extractor, weighting engine, and report logic
 - `migrations/` — versioned SQLite migrations
 - `schemas/` — planned versioned interchange schemas
-- `prompts/` — planned PPE and recommendation prompts and output contracts
+- `prompts/` — planned recommendation prompts and output contracts
 - `knowledge-base/` — planned source policies, claim records, and curated notes
 - `tests/` — unit and integration tests
 - `scripts/` — planned development and data-maintenance utilities
@@ -84,5 +103,6 @@ Start with:
 - [`docs/architecture/SYSTEM_OVERVIEW.md`](docs/architecture/SYSTEM_OVERVIEW.md)
 - [`docs/implementation/PHASE1_CORE.md`](docs/implementation/PHASE1_CORE.md)
 - [`docs/PHASE2_RAID_REVIEW.md`](docs/PHASE2_RAID_REVIEW.md)
+- [`docs/PHASE3_PERSONAL_PLAYSTYLE_ENGINE.md`](docs/PHASE3_PERSONAL_PLAYSTYLE_ENGINE.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
 - [`docs/SAFETY_AND_COMPLIANCE.md`](docs/SAFETY_AND_COMPLIANCE.md)

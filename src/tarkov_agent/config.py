@@ -24,10 +24,15 @@ class PathSettings(BaseModel):
     def diagnostics_root(self) -> Path:
         return self.data_root / "diagnostics"
 
+    @property
+    def ppe_root(self) -> Path:
+        return self.data_root / "ppe"
+
     def ensure_directories(self) -> None:
         self.data_root.mkdir(parents=True, exist_ok=True)
         self.raids_root.mkdir(parents=True, exist_ok=True)
         self.diagnostics_root.mkdir(parents=True, exist_ok=True)
+        self.ppe_root.mkdir(parents=True, exist_ok=True)
 
 
 class ProcessSettings(BaseModel):
@@ -78,6 +83,19 @@ class DiagnosticSettings(BaseModel):
     maximum_lines: int = Field(default=10000, ge=1, le=1_000_000)
 
 
+class PpeSettings(BaseModel):
+    enabled: bool = True
+    neutral_prior_weight: float = Field(default=1.25, ge=0.0, le=20.0)
+    confidence_weight_scale: float = Field(default=2.5, gt=0.0, le=100.0)
+    maximum_weight_per_raid_dimension: float = Field(default=1.0, gt=0.0, le=20.0)
+    minimum_report_confidence: float = Field(default=0.25, ge=0.0, le=1.0)
+    minimum_established_confidence: float = Field(default=0.50, ge=0.0, le=1.0)
+    signal_threshold: float = Field(default=0.20, ge=0.0, le=1.0)
+    context_difference_threshold: float = Field(default=0.35, ge=0.0, le=2.0)
+    minimum_independent_raids: int = Field(default=3, ge=1, le=1000)
+    maximum_history: int = Field(default=200, ge=1, le=10000)
+
+
 class RuntimeSettings(BaseModel):
     auto_create_raid_package: bool = True
     auto_complete_raid_on_end: bool = False
@@ -100,6 +118,7 @@ class AppSettings(BaseSettings):
     obs: ObsSettings = Field(default_factory=ObsSettings)
     api: ApiSettings = Field(default_factory=ApiSettings)
     diagnostics: DiagnosticSettings = Field(default_factory=DiagnosticSettings)
+    ppe: PpeSettings = Field(default_factory=PpeSettings)
     runtime: RuntimeSettings = Field(default_factory=RuntimeSettings)
 
     @model_validator(mode="after")
@@ -114,6 +133,11 @@ class AppSettings(BaseSettings):
         loopback_hosts = {"127.0.0.1", "localhost", "::1"}
         if self.api.enabled and self.api.host not in loopback_hosts and not self.api.token:
             raise ValueError("A non-loopback API host requires api.token")
+        if self.ppe.minimum_established_confidence < self.ppe.minimum_report_confidence:
+            raise ValueError(
+                "ppe.minimum_established_confidence must be at least "
+                "ppe.minimum_report_confidence"
+            )
         return self
 
     @classmethod

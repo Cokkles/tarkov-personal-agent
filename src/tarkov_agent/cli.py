@@ -18,6 +18,7 @@ from tarkov_agent.integrations.obs import ObsIntegrationError, build_recording_c
 from tarkov_agent.observers.logs import LogTailObserver
 from tarkov_agent.observers.process import ProcessObserver
 from tarkov_agent.services.diagnostics import DiagnosticCaptureService
+from tarkov_agent.services.ppe import PPEDisabledError
 
 _CONFIG_TEMPLATE = """# Tarkov Personal Agent configuration
 
@@ -64,6 +65,18 @@ allowed_evidence_roots = []
 default_capture_seconds = 120.0
 maximum_lines = 10000
 
+[ppe]
+enabled = true
+neutral_prior_weight = 1.25
+confidence_weight_scale = 2.5
+maximum_weight_per_raid_dimension = 1.0
+minimum_report_confidence = 0.25
+minimum_established_confidence = 0.50
+signal_threshold = 0.20
+context_difference_threshold = 0.35
+minimum_independent_raids = 3
+maximum_history = 200
+
 [runtime]
 auto_create_raid_package = true
 auto_complete_raid_on_end = false
@@ -99,6 +112,7 @@ def _command_doctor(args: argparse.Namespace) -> int:
         settings.process.executable_names,
         settings.process.poll_interval_seconds,
     ).snapshot()
+    profile = context.ppe.current()
     report: dict[str, object] = {
         "data_root": str(settings.paths.data_root),
         "database_path": str(settings.paths.database_path),
@@ -123,6 +137,12 @@ def _command_doctor(args: argparse.Namespace) -> int:
             "host": settings.api.host,
             "port": settings.api.port,
             "token_required": bool(settings.api.token),
+        },
+        "ppe": {
+            "enabled": settings.ppe.enabled,
+            "profile_version": profile.version if profile is not None else None,
+            "evidence_count": len(context.ppe.evidence(limit=10000)),
+            "profile_root": str(settings.paths.ppe_root),
         },
         "obs": {"enabled": settings.obs.enabled},
     }
@@ -197,6 +217,33 @@ def _command_capture_logs(args: argparse.Namespace) -> int:
     return 0
 
 
+def _command_ppe_rebuild(args: argparse.Namespace) -> int:
+    context = _context(args.config)
+    try:
+        result = context.ppe.rebuild(
+            trigger="cli-force-rebuild" if args.force else "cli-rebuild",
+            force=args.force,
+        )
+    except PPEDisabledError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    snapshot = result.snapshot
+    print(
+        json.dumps(
+            {
+                "profile_version": snapshot.version,
+                "evidence_count": snapshot.evidence_count,
+                "estimate_count": len(snapshot.estimates),
+                "established_strengths": snapshot.established_strengths,
+                "likely_constraints": snapshot.likely_constraints,
+                "report_path": str(context.settings.paths.ppe_root / "profile-report.md"),
+            },
+            indent=2,
+        )
+    )
+    return 0
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="tarkov-agent",
@@ -240,6 +287,14 @@ def _parser() -> argparse.ArgumentParser:
     capture_parser.add_argument("--seconds", type=float)
     capture_parser.add_argument("--label", default="log-capture")
     capture_parser.set_defaults(func=_command_capture_logs)
+
+    ppe_parser = subparsers.add_parser(
+        "ppe-rebuild",
+        help="Recalculate the Personal Playstyle Engine profile from stored evidence",
+    )
+    ppe_parser.add_argument("--config")
+    ppe_parser.add_argument("--force", action="store_true")
+    ppe_parser.set_defaults(func=_command_ppe_rebuild)
     return parser
 
 
