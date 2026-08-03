@@ -14,6 +14,7 @@ class RaidSignal(StrEnum):
     RAID_CANDIDATE_FOUND = "raid_candidate_found"
     RAID_STARTED = "raid_started"
     RAID_ENDED = "raid_ended"
+    REVIEW_REQUIRED = "review_required"
     REVIEW_COMPLETED = "review_completed"
     ABORT = "abort"
     RESET = "reset"
@@ -41,8 +42,10 @@ _TRANSITIONS: dict[tuple[RaidState, RaidSignal], RaidState] = {
     (RaidState.RAID_CANDIDATE, RaidSignal.RAID_STARTED): RaidState.IN_RAID,
     (RaidState.GAME_RUNNING, RaidSignal.RAID_STARTED): RaidState.IN_RAID,
     (RaidState.IN_RAID, RaidSignal.RAID_ENDED): RaidState.ENDING,
+    (RaidState.ENDING, RaidSignal.REVIEW_REQUIRED): RaidState.REVIEW_PENDING,
     (RaidState.ENDING, RaidSignal.REVIEW_COMPLETED): RaidState.COMPLETE,
     (RaidState.REVIEW_PENDING, RaidSignal.REVIEW_COMPLETED): RaidState.COMPLETE,
+    (RaidState.REVIEW_PENDING, RaidSignal.RESET): RaidState.GAME_RUNNING,
     (RaidState.COMPLETE, RaidSignal.MATCHMAKING_STARTED): RaidState.MATCHMAKING,
     (RaidState.COMPLETE, RaidSignal.RAID_CANDIDATE_FOUND): RaidState.RAID_CANDIDATE,
     (RaidState.COMPLETE, RaidSignal.RAID_STARTED): RaidState.IN_RAID,
