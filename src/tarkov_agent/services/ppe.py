@@ -9,6 +9,7 @@ from uuid import uuid4
 from tarkov_agent.config import PpeSettings
 from tarkov_agent.domain.models import RaidRecord
 from tarkov_agent.domain.ppe import (
+    DimensionDefinition,
     EvidenceSource,
     ManualEvidenceRequest,
     PPEEvidence,
@@ -54,8 +55,8 @@ class PPEProfileService:
         self._extractor = ReviewEvidenceExtractor(registry)
         self._engine = PPEEngine(registry, settings)
 
-    def dimensions(self) -> list[object]:
-        return list(self._registry.list())
+    def dimensions(self) -> list[DimensionDefinition]:
+        return self._registry.list()
 
     def ingest_finalized_review(
         self,
@@ -100,12 +101,19 @@ class PPEProfileService:
         snapshot = self.rebuild(trigger=f"manual-evidence:{evidence.id}").snapshot
         return evidence, snapshot
 
-    def rebuild(self, *, trigger: str = "manual-rebuild", force: bool = False) -> ProfileBuildResult:
+    def rebuild(
+        self,
+        *,
+        trigger: str = "manual-rebuild",
+        force: bool = False,
+    ) -> ProfileBuildResult:
         self._require_enabled()
         evidence = self._repository.list_ppe_evidence()
         fingerprint = self._fingerprint(evidence)
         previous = self._repository.get_latest_profile_snapshot()
-        if previous is not None and previous.evidence_fingerprint == fingerprint and not force:
+        unchanged = previous is not None and previous.evidence_fingerprint == fingerprint
+        if unchanged and not force:
+            assert previous is not None
             return ProfileBuildResult(
                 snapshot=previous,
                 audit=ProfileAuditEntry(
@@ -204,11 +212,7 @@ class PPEProfileService:
         if not (raid.data_root / "raid.json").exists():
             return
         dimensions = sorted(
-            {
-                impact.dimension_key
-                for item in evidence
-                for impact in item.impacts
-            }
+            {impact.dimension_key for item in evidence for impact in item.impacts}
         )
         payload = {
             "schema_version": 1,
@@ -217,7 +221,8 @@ class PPEProfileService:
             "evidence_ids": [str(item.id) for item in evidence],
             "dimensions_touched": dimensions,
             "warning": (
-                "This file records profile inputs. It does not claim that one raid establishes a trait."
+                "This file records profile inputs. It does not claim that one raid "
+                "establishes a trait."
             ),
         }
         _atomic_write(
