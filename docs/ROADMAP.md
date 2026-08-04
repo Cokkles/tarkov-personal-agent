@@ -116,24 +116,32 @@ Delivered:
 
 Exit condition met: the system produces a primary and fallback plan with traceable mechanics and player evidence.
 
-## Phase 6 — Media Assistance
+## Phase 6 — Media Assistance — Complete
+
+Delivered:
 
 - Reliable OBS output association after file finalization
-- Recording index with canonical path, duration, size, hash, and availability
-- Reference-first storage with optional copy-on-export
-- Marker-to-recording navigation offsets
+- Configurable file-size and modification-time stability checks
+- Recording index with canonical path, duration, dimensions, codecs, stream count, size, SHA-256, and availability
+- Reference-first storage with optional package copying
+- Idempotent re-indexing for unchanged recordings
+- Timeline and Stream Deck marker navigation offsets
 - Optional FFmpeg clip extraction around selected markers
-- End-of-raid screenshot workflow
-- Optional local transcription and scene-change assistance
+- Optional ffprobe media inspection
+- Manual association for earlier or externally managed recordings
+- Media index, browser dashboard, and local API
+- Clear timeline events for indexed, unindexed, and failed recording finalization
+- Approved-root enforcement for media paths
+- Cross-platform automated tests
 
-Computer vision, OCR, and transcription remain optional and must not become prerequisites for core logging.
+Exit condition met: completed recordings can be indexed after stabilization, preserved by reference or copy, mapped to timeline events, and used for optional local clips without becoming a dependency for raid logging or review.
 
 ## Phase 6.5 — Desktop Companion
 
 - Native Windows launcher and system-tray application
 - Dashboard for agent, Tarkov, OBS, recording, and active-raid status
 - Live marker controls and review queue access
-- Embedded or linked Raid Review, PPE, Source of Truth, and Recommendation views
+- Embedded or linked Raid Review, PPE, Source of Truth, Recommendation, and Media views
 - Start-with-Windows and one-click shortcut packaging
 - Existing local service remains the stable backend and web UI remains available for diagnostics
 

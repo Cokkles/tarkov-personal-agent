@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tarkov Media Assistance</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,Segoe UI,sans-serif;background:#0b1015;color:#e8eef5}body{margin:0}header{padding:18px 24px;border-bottom:1px solid #27313c;background:#111820}main{display:grid;grid-template-columns:minmax(320px,440px) 1fr;gap:18px;padding:20px}.card{background:#111820;border:1px solid #27313c;border-radius:12px;padding:18px}label{display:block;margin:12px 0 5px;color:#aebdca;font-size:.9rem}input,button{width:100%;box-sizing:border-box;border-radius:8px;border:1px solid #344351;background:#0b1117;color:#eef5fb;padding:10px}button{margin-top:12px;background:#326da8;border-color:#4b88c5;font-weight:700;cursor:pointer}.muted{color:#91a0ae}.item{padding:12px;border:1px solid #344351;border-radius:9px;margin:10px 0;background:#0d141b}.ok{color:#78d79d}.warn{color:#f0c674}code{word-break:break-all}@media(max-width:900px){main{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><strong>Tarkov Personal Agent — Media Assistance</strong> <span class="muted">| <a href="/" style="color:#8fc7ff">Raid Review</a> · <a href="/ppe" style="color:#8fc7ff">PPE</a> · <a href="/truth" style="color:#8fc7ff">Truth</a> · <a href="/recommendations" style="color:#8fc7ff">Recommendations</a></span></header>
+<main>
+<section class="card">
+<h2>Select raid</h2>
+<label for="raid">Raid ID</label><input id="raid" placeholder="Paste the raid UUID">
+<button id="load">Load media</button>
+<h2>Associate recording</h2>
+<label for="path">Recording path</label><input id="path" placeholder="D:\OBS Recordings\raid.mkv">
+<label><input id="copy" type="checkbox" style="width:auto"> Copy recording into raid package</label>
+<button id="associate">Index recording</button>
+<p id="message" class="muted"></p>
+</section>
+<section class="card">
+<h2>Indexed media</h2>
+<div id="recordings"><p class="muted">Load a raid to inspect recordings.</p></div>
+<h2>Timeline navigation</h2>
+<div id="navigation"><p class="muted">Markers and events appear after a recording is indexed.</p></div>
+</section>
+</main>
+<script>
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const raid=()=>document.getElementById('raid').value.trim();
+const message=t=>document.getElementById('message').textContent=t;
+async function load(){
+  if(!raid()){message('Raid ID is required.');return;}
+  const media=await fetch(`/api/raids/${raid()}/media`);
+  if(!media.ok){const e=await media.json();message(e.detail||'Unable to load media.');return;}
+  const data=await media.json();
+  document.getElementById('recordings').innerHTML=data.recordings.length?data.recordings.map(r=>`<div class="item"><strong>${esc(r.source)} recording</strong><p class="${r.available?'ok':'warn'}">${r.available?'Available':'Missing'}</p><code>${esc(r.canonical_path)}</code><p>${(r.size_bytes/1048576).toFixed(1)} MB · ${esc(r.probe_status)}${r.duration_seconds?` · ${r.duration_seconds.toFixed(1)} s`:''}</p><p>SHA-256: <code>${esc(r.sha256)}</code></p></div>`).join(''):'<p class="muted">No indexed recording.</p>';
+  const nav=await fetch(`/api/raids/${raid()}/media/navigation`);
+  const points=nav.ok?await nav.json():[];
+  document.getElementById('navigation').innerHTML=points.length?points.map(p=>`<div class="item"><strong>${esc(p.label)}</strong><p>${(p.raid_offset_ms/1000).toFixed(3)} s · ${esc(p.event_type)}</p><button onclick="clip('${esc(p.timeline_event_id)}')">Extract marker clip</button></div>`).join(''):'<p class="muted">No timestamped events are available.</p>';
+  message('Media index loaded.');
+}
+async function associate(){
+  if(!raid()){message('Raid ID is required.');return;}
+  const path=document.getElementById('path').value.trim();
+  if(!path){message('Recording path is required.');return;}
+  message('Waiting for the recording file to become stable…');
+  const response=await fetch(`/api/raids/${raid()}/media/recordings`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path,copy_into_package:document.getElementById('copy').checked})});
+  const data=await response.json();
+  if(!response.ok){message(data.detail||'Unable to index recording.');return;}
+  message('Recording indexed.');await load();
+}
+async function clip(eventId){
+  message('Extracting clip with FFmpeg…');
+  const response=await fetch(`/api/raids/${raid()}/media/clips`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({timeline_event_id:eventId,seconds_before:10,seconds_after:15})});
+  const data=await response.json();
+  if(!response.ok){message(data.detail||'Unable to extract clip.');return;}
+  message(`Clip created: ${data.clip.path}`);await load();
+}
+document.getElementById('load').addEventListener('click',load);
+document.getElementById('associate').addEventListener('click',associate);
+</script>
+</body>
+</html>

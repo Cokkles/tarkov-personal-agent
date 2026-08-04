@@ -1,22 +1,35 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
 from tarkov_agent.config import AppSettings
+from tarkov_agent.domain.media import MediaSource
 from tarkov_agent.domain.models import (
-    EvidenceKind,
     Game,
     RaidRecord,
     RaidState,
     TimelineEvent,
 )
-from tarkov_agent.domain.state_machine import RaidLifecycle, RaidSignal, StateTransition
-from tarkov_agent.integrations.obs import ObsIntegrationError, RecordingController
+from tarkov_agent.domain.state_machine import (
+    RaidLifecycle,
+    RaidSignal,
+    StateTransition,
+)
+from tarkov_agent.integrations.obs import (
+    ObsIntegrationError,
+    RecordingController,
+    RecordingStatus,
+)
 from tarkov_agent.observers.process import ProcessSnapshot
 from tarkov_agent.services.markers import MarkerService
-from tarkov_agent.services.packages import RaidPackageBuilder, RaidPackageError
+from tarkov_agent.services.media import (
+    MediaDisabledError,
+    MediaFinalizationError,
+    MediaPathError,
+    MediaService,
+)
+from tarkov_agent.services.packages import RaidPackageBuilder
 from tarkov_agent.storage.database import RaidRepository
 
 
@@ -30,12 +43,14 @@ class RaidCoordinator:
         packages: RaidPackageBuilder,
         markers: MarkerService,
         recording: RecordingController,
+        media: MediaService | None = None,
     ) -> None:
         self.settings = settings
         self.repository = repository
         self.packages = packages
         self.markers = markers
         self.recording = recording
+        self.media = media
         self.lifecycle = RaidLifecycle()
         self.active_raid: RaidRecord | None = None
 
@@ -46,12 +61,18 @@ class RaidCoordinator:
         self.active_raid = raid
         self.markers.activate(raid)
 
-    def handle_process_snapshot(self, snapshot: ProcessSnapshot) -> StateTransition | None:
+    def handle_process_snapshot(
+        self,
+        snapshot: ProcessSnapshot,
+    ) -> StateTransition | None:
         if snapshot.running and self.lifecycle.can_apply(RaidSignal.GAME_FOUND):
             return self.handle_signal(
                 RaidSignal.GAME_FOUND,
                 occurred_at=snapshot.observed_at,
-                reason=f"Observed process {snapshot.executable_name} ({snapshot.pid})",
+                reason=(
+                    f"Observed process {snapshot.executable_name} "
+                    f"({snapshot.pid})"
+                ),
             )
         if not snapshot.running and self.lifecycle.can_apply(RaidSignal.GAME_LOST):
             return self.handle_signal(
@@ -70,7 +91,11 @@ class RaidCoordinator:
         payload: dict[str, Any] | None = None,
     ) -> StateTransition:
         timestamp = occurred_at or datetime.now(UTC)
-        transition = self.lifecycle.apply(signal, occurred_at=timestamp, reason=reason)
+        transition = self.lifecycle.apply(
+            signal,
+            occurred_at=timestamp,
+            reason=reason,
+        )
         details = payload or {}
 
         if signal is RaidSignal.RAID_STARTED:
@@ -93,7 +118,10 @@ class RaidCoordinator:
                 self._queue_review(pending)
         elif signal is RaidSignal.REVIEW_COMPLETED:
             self._complete_review(transition)
-        elif signal in {RaidSignal.ABORT, RaidSignal.GAME_LOST} and self.active_raid is not None:
+        elif (
+            signal in {RaidSignal.ABORT, RaidSignal.GAME_LOST}
+            and self.active_raid is not None
+        ):
             self._abort_or_interrupt(timestamp, transition)
         elif self.active_raid is not None:
             self._update_active_state(transition)
@@ -107,7 +135,9 @@ class RaidCoordinator:
         transition: StateTransition,
     ) -> None:
         if self.active_raid is not None:
-            raise RuntimeError("Cannot start a new raid while another raid is active")
+            raise RuntimeError(
+                "Cannot start a new raid while another raid is active"
+            )
 
         raid = RaidRecord(
             game=self._game(payload.get("game")),
@@ -115,8 +145,12 @@ class RaidCoordinator:
             started_at=timestamp,
             map_name=self._optional_text(payload.get("map_name")),
             character_type=self._optional_text(payload.get("character_type")),
-            primary_objective=self._optional_text(payload.get("primary_objective")),
-            secondary_objective=self._optional_text(payload.get("secondary_objective")),
+            primary_objective=self._optional_text(
+                payload.get("primary_objective")
+            ),
+            secondary_objective=self._optional_text(
+                payload.get("secondary_objective")
+            ),
             data_root=self.settings.paths.raids_root,
         )
         if self.settings.runtime.auto_create_raid_package:
@@ -126,7 +160,10 @@ class RaidCoordinator:
         self.repository.save_raid(raid)
         self._append_transition_event(raid, transition)
 
-        if self.settings.obs.enabled and self.settings.obs.start_recording_on_raid_start:
+        if (
+            self.settings.obs.enabled
+            and self.settings.obs.start_recording_on_raid_start
+        ):
             try:
                 status = self.recording.start()
                 self._append_system_event(
@@ -134,7 +171,10 @@ class RaidCoordinator:
                     "recording_started",
                     "OBS recording start requested",
                     timestamp,
-                    {"active": status.active, "connected": status.connected},
+                    {
+                        "active": status.active,
+                        "connected": status.connected,
+                    },
                 )
             except ObsIntegrationError as exc:
                 self._append_system_event(
@@ -154,13 +194,21 @@ class RaidCoordinator:
         raid = self._require_active_raid()
         result = self._optional_text(payload.get("result")) or raid.result
         raid = raid.model_copy(
-            update={"state": transition.to_state, "ended_at": timestamp, "result": result}
+            update={
+                "state": transition.to_state,
+                "ended_at": timestamp,
+                "result": result,
+            }
         )
         self.active_raid = raid
         self.markers.activate(raid)
         self._append_transition_event(raid, transition)
+        self._persist_active()
 
-        if self.settings.obs.enabled and self.settings.obs.stop_recording_on_raid_end:
+        if (
+            self.settings.obs.enabled
+            and self.settings.obs.stop_recording_on_raid_end
+        ):
             try:
                 status = self.recording.stop()
                 self._append_system_event(
@@ -170,31 +218,91 @@ class RaidCoordinator:
                     timestamp,
                     {"output_path": status.output_path},
                 )
-                if status.output_path:
-                    recording_path = Path(status.output_path)
-                    if recording_path.exists():
-                        raid, _ = self.packages.attach_file(
-                            raid,
-                            recording_path,
-                            EvidenceKind.RECORDING,
-                            copy_into_package=self.settings.runtime.copy_evidence_into_package,
-                            metadata={"source": "obs"},
-                        )
-                        self.active_raid = raid
-                        self.markers.activate(raid)
-            except (ObsIntegrationError, RaidPackageError) as exc:
+                self._finalize_recording(status, timestamp)
+            except ObsIntegrationError as exc:
                 self._append_system_event(
-                    raid,
+                    self._require_active_raid(),
                     "recording_error",
-                    "OBS recording could not be finalized",
+                    "OBS recording could not be stopped",
                     timestamp,
                     {"error": str(exc)},
                 )
 
         self._persist_active()
 
+    def _finalize_recording(
+        self,
+        status: RecordingStatus,
+        timestamp: datetime,
+    ) -> None:
+        raid = self._require_active_raid()
+        if not status.output_path:
+            self._append_system_event(
+                raid,
+                "recording_unindexed",
+                "OBS returned no recording output path",
+                timestamp,
+                {},
+                confidence=0.8,
+            )
+            return
+        if self.media is None:
+            self._append_system_event(
+                raid,
+                "recording_unindexed",
+                "Media Assistance is not available",
+                timestamp,
+                {"output_path": status.output_path},
+                confidence=0.8,
+            )
+            return
+        try:
+            updated, asset = self.media.index_recording(
+                raid.id,
+                status.output_path,
+                media_source=MediaSource.OBS,
+                copy_into_package=(
+                    self.settings.media.copy_recordings_into_package
+                ),
+            )
+        except (
+            MediaDisabledError,
+            MediaFinalizationError,
+            MediaPathError,
+        ) as exc:
+            self._append_system_event(
+                raid,
+                "recording_index_error",
+                "OBS recording could not be indexed",
+                timestamp,
+                {
+                    "output_path": status.output_path,
+                    "error": str(exc),
+                },
+            )
+            return
+        self.active_raid = updated
+        self.markers.activate(updated)
+        self._append_system_event(
+            updated,
+            "recording_indexed",
+            "OBS recording indexed",
+            timestamp,
+            {
+                "recording_id": str(asset.id),
+                "evidence_id": str(asset.evidence_id),
+                "path": str(asset.canonical_path),
+                "size_bytes": asset.size_bytes,
+                "sha256": asset.sha256,
+                "probe_status": asset.probe_status.value,
+                "duration_seconds": asset.duration_seconds,
+            },
+        )
+
     def _queue_review(self, transition: StateTransition) -> None:
-        raid = self._require_active_raid().model_copy(update={"state": transition.to_state})
+        raid = self._require_active_raid().model_copy(
+            update={"state": transition.to_state}
+        )
         self.active_raid = raid
         self._append_transition_event(raid, transition)
         self._persist_active()
@@ -222,7 +330,11 @@ class RaidCoordinator:
                 reason="Runtime reset after completing raid review",
             )
 
-    def _abort_or_interrupt(self, timestamp: datetime, transition: StateTransition) -> None:
+    def _abort_or_interrupt(
+        self,
+        timestamp: datetime,
+        transition: StateTransition,
+    ) -> None:
         raid = self._require_active_raid()
         raid = raid.model_copy(
             update={
@@ -233,9 +345,18 @@ class RaidCoordinator:
         self.active_raid = raid
         self.markers.activate(raid)
         self._append_transition_event(raid, transition)
+        self._persist_active()
         if self.settings.obs.enabled:
             try:
-                self.recording.stop()
+                status = self.recording.stop()
+                self._append_system_event(
+                    raid,
+                    "recording_stopped",
+                    "OBS recording stopped during interruption",
+                    timestamp,
+                    {"output_path": status.output_path},
+                )
+                self._finalize_recording(status, timestamp)
             except ObsIntegrationError as exc:
                 self._append_system_event(
                     raid,
@@ -250,19 +371,28 @@ class RaidCoordinator:
             self.active_raid = None
 
     def _update_active_state(self, transition: StateTransition) -> None:
-        raid = self._require_active_raid().model_copy(update={"state": transition.to_state})
+        raid = self._require_active_raid().model_copy(
+            update={"state": transition.to_state}
+        )
         self.active_raid = raid
         self.markers.activate(raid)
         self._append_transition_event(raid, transition)
         self._persist_active()
 
-    def _append_transition_event(self, raid: RaidRecord, transition: StateTransition) -> None:
+    def _append_transition_event(
+        self,
+        raid: RaidRecord,
+        transition: StateTransition,
+    ) -> None:
         self._append_system_event(
             raid,
             "lifecycle_transition",
             f"{transition.from_state.value} -> {transition.to_state.value}",
             transition.occurred_at,
-            {"signal": transition.signal.value, "reason": transition.reason},
+            {
+                "signal": transition.signal.value,
+                "reason": transition.reason,
+            },
         )
 
     def _append_system_event(
@@ -277,7 +407,10 @@ class RaidCoordinator:
     ) -> TimelineEvent:
         offset_ms = None
         if raid.started_at is not None:
-            offset_ms = max(0, int((occurred_at - raid.started_at).total_seconds() * 1000))
+            offset_ms = max(
+                0,
+                int((occurred_at - raid.started_at).total_seconds() * 1000),
+            )
         event = TimelineEvent(
             raid_id=raid.id,
             occurred_at=occurred_at,

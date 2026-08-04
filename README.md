@@ -2,18 +2,19 @@
 
 A local-first, passive companion and analytics platform for **Escape from Tarkov** and **Escape from Tarkov: Arena**.
 
-The project combines four systems:
+The project combines five systems:
 
 1. **Source of Truth** — patch-aware, source-ranked game knowledge.
 2. **Raid Companion** — passive log monitoring, OBS recording control, event markers, screenshots, and raid packaging.
 3. **Personal Playstyle Engine (PPE)** — evidence-based analysis of objectives, encounters, decisions, strengths, limitations, and strategy fit.
 4. **Recommendation Engine** — traceable plans based on verified mechanics, player evidence, objectives, risk, and confidence.
+5. **Media Assistance** — finalized recording indexing, marker navigation, evidence integrity, and optional local clips.
 
 ## Project status
 
-**Phase 5: Recommendation Engine.**
+**Phase 6: Media Assistance.**
 
-The repository contains a runnable local companion, browser raid-review workflow, explainable PPE, patch-aware Source-of-Truth registry, and deterministic Recommendation Engine. The engine generates primary and fallback strategies, blocks plans that depend on unresolved mechanics, scores player and risk fit, preserves assumptions and evidence references, and creates controlled training experiments.
+The repository contains a runnable local companion, browser raid-review workflow, explainable PPE, patch-aware Source-of-Truth registry, deterministic Recommendation Engine, and reference-first media manager. OBS recordings are indexed only after their files stabilize, preserving final size and SHA-256 metadata. Timeline events and Stream Deck markers are exposed as recording seek offsets, while optional FFmpeg clips can be generated around selected moments.
 
 No Tarkov log signatures ship enabled yet. Automatic raid detection remains disabled until current redacted samples are validated against false positives. Manual lifecycle controls provide the safe fallback in the meantime.
 
@@ -42,9 +43,29 @@ http://127.0.0.1:8765/                 Raid Review
 http://127.0.0.1:8765/ppe              Personal Playstyle Engine
 http://127.0.0.1:8765/truth            Source of Truth
 http://127.0.0.1:8765/recommendations  Recommendation Engine
+http://127.0.0.1:8765/media            Media Assistance
 ```
 
 The raid-review application supports manual raid start/end controls, live markers, pending-review selection, multiple encounter records, corrected metadata, review audit history, and Markdown or JSON export. Finalizing a review updates the PPE using only explicit structured evidence.
+
+## Recording setup
+
+When the OBS recording folder is outside the agent data root, add it to the approved evidence roots:
+
+```toml
+[api]
+allowed_evidence_roots = [
+  "D:/OBS Recordings"
+]
+
+[media]
+enabled = true
+copy_recordings_into_package = false
+```
+
+Reference-first storage is the default: the raid package records the final path, size, SHA-256, availability, and optional probe metadata without duplicating the full recording. Set `copy_recordings_into_package = true` only when every recording should be copied into its raid package.
+
+`ffprobe` and `ffmpeg` are optional. Indexing, hashing, and marker navigation work without them; media probing and clip extraction require the corresponding executable to be available on `PATH` or configured explicitly.
 
 Recalculate the profile from stored evidence:
 
@@ -78,6 +99,15 @@ tarkov-agent capture-logs --config config.toml --seconds 180 --label scav-surviv
 ```
 
 Captured diagnostics must still be reviewed manually before sharing or committing.
+
+## Media safeguards
+
+- OBS files are allowed to stabilize before size and SHA-256 are calculated.
+- Recording references remain local and are not uploaded.
+- Manual media paths must be under the data root or an explicitly approved evidence root.
+- Full recordings are referenced rather than copied by default.
+- Missing FFmpeg or ffprobe does not break raid logging, review, or PPE processing.
+- Video, OCR, transcription, and computer vision remain optional assistance layers.
 
 ## Recommendation safeguards
 
@@ -128,6 +158,8 @@ Captured diagnostics must still be reviewed manually before sharing or committin
 - `src/tarkov_agent/services/source_truth.py` — ranking, verification, conflict, review, query, and export logic
 - `src/tarkov_agent/domain/recommendations.py` — recommendation request, candidate, scoring, and output models
 - `src/tarkov_agent/services/recommendations.py` — candidate generation, filtering, scoring, experiments, and exports
+- `src/tarkov_agent/domain/media.py` — recording, navigation, clip, and media-index models
+- `src/tarkov_agent/services/media.py` — stabilization, hashing, probing, navigation, and clip extraction
 - `migrations/` — versioned SQLite migrations
 - `schemas/` — planned versioned interchange schemas
 - `prompts/` — planned advanced reasoning prompts and output contracts
@@ -150,6 +182,7 @@ Start with:
 - [`docs/PHASE3_PERSONAL_PLAYSTYLE_ENGINE.md`](docs/PHASE3_PERSONAL_PLAYSTYLE_ENGINE.md)
 - [`docs/PHASE4_SOURCE_OF_TRUTH.md`](docs/PHASE4_SOURCE_OF_TRUTH.md)
 - [`docs/PHASE5_RECOMMENDATION_ENGINE.md`](docs/PHASE5_RECOMMENDATION_ENGINE.md)
+- [`docs/PHASE6_MEDIA_ASSISTANCE.md`](docs/PHASE6_MEDIA_ASSISTANCE.md)
 - [`docs/SETUP_AND_SCAV_TEST.md`](docs/SETUP_AND_SCAV_TEST.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
 - [`docs/SAFETY_AND_COMPLIANCE.md`](docs/SAFETY_AND_COMPLIANCE.md)

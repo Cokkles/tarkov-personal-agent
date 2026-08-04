@@ -36,6 +36,10 @@ class PathSettings(BaseModel):
     def recommendations_root(self) -> Path:
         return self.data_root / "recommendations"
 
+    @property
+    def media_root(self) -> Path:
+        return self.data_root / "media"
+
     def ensure_directories(self) -> None:
         self.data_root.mkdir(parents=True, exist_ok=True)
         self.raids_root.mkdir(parents=True, exist_ok=True)
@@ -43,6 +47,7 @@ class PathSettings(BaseModel):
         self.ppe_root.mkdir(parents=True, exist_ok=True)
         self.source_truth_root.mkdir(parents=True, exist_ok=True)
         self.recommendations_root.mkdir(parents=True, exist_ok=True)
+        self.media_root.mkdir(parents=True, exist_ok=True)
 
 
 class ProcessSettings(BaseModel):
@@ -122,6 +127,28 @@ class RecommendationSettings(BaseModel):
     maximum_history: int = Field(default=200, ge=1, le=10000)
 
 
+class MediaSettings(BaseModel):
+    enabled: bool = True
+    copy_recordings_into_package: bool = False
+    file_stability_timeout_seconds: float = Field(
+        default=30.0,
+        gt=0.0,
+        le=300.0,
+    )
+    file_stability_poll_seconds: float = Field(
+        default=0.5,
+        gt=0.0,
+        le=10.0,
+    )
+    file_stability_checks: int = Field(default=3, ge=1, le=20)
+    ffprobe_path: str = Field(default="ffprobe", min_length=1, max_length=500)
+    ffmpeg_path: str = Field(default="ffmpeg", min_length=1, max_length=500)
+    probe_timeout_seconds: float = Field(default=20.0, gt=0.0, le=300.0)
+    clip_timeout_seconds: float = Field(default=180.0, gt=0.0, le=3600.0)
+    default_clip_seconds_before: float = Field(default=10.0, ge=0.0, le=300.0)
+    default_clip_seconds_after: float = Field(default=15.0, gt=0.0, le=600.0)
+
+
 class RuntimeSettings(BaseModel):
     auto_create_raid_package: bool = True
     auto_complete_raid_on_end: bool = False
@@ -147,6 +174,7 @@ class AppSettings(BaseSettings):
     ppe: PpeSettings = Field(default_factory=PpeSettings)
     truth: SourceTruthSettings = Field(default_factory=SourceTruthSettings)
     recommendations: RecommendationSettings = Field(default_factory=RecommendationSettings)
+    media: MediaSettings = Field(default_factory=MediaSettings)
     runtime: RuntimeSettings = Field(default_factory=RuntimeSettings)
 
     @model_validator(mode="after")
