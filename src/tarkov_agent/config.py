@@ -32,12 +32,17 @@ class PathSettings(BaseModel):
     def source_truth_root(self) -> Path:
         return self.data_root / "source-truth"
 
+    @property
+    def recommendations_root(self) -> Path:
+        return self.data_root / "recommendations"
+
     def ensure_directories(self) -> None:
         self.data_root.mkdir(parents=True, exist_ok=True)
         self.raids_root.mkdir(parents=True, exist_ok=True)
         self.diagnostics_root.mkdir(parents=True, exist_ok=True)
         self.ppe_root.mkdir(parents=True, exist_ok=True)
         self.source_truth_root.mkdir(parents=True, exist_ok=True)
+        self.recommendations_root.mkdir(parents=True, exist_ok=True)
 
 
 class ProcessSettings(BaseModel):
@@ -111,6 +116,12 @@ class SourceTruthSettings(BaseModel):
     stale_grace_days: int = Field(default=14, ge=0, le=3650)
 
 
+class RecommendationSettings(BaseModel):
+    enabled: bool = True
+    minimum_plan_confidence: float = Field(default=0.40, ge=0.0, le=1.0)
+    maximum_history: int = Field(default=200, ge=1, le=10000)
+
+
 class RuntimeSettings(BaseModel):
     auto_create_raid_package: bool = True
     auto_complete_raid_on_end: bool = False
@@ -135,6 +146,7 @@ class AppSettings(BaseSettings):
     diagnostics: DiagnosticSettings = Field(default_factory=DiagnosticSettings)
     ppe: PpeSettings = Field(default_factory=PpeSettings)
     truth: SourceTruthSettings = Field(default_factory=SourceTruthSettings)
+    recommendations: RecommendationSettings = Field(default_factory=RecommendationSettings)
     runtime: RuntimeSettings = Field(default_factory=RuntimeSettings)
 
     @model_validator(mode="after")
