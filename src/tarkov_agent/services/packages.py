@@ -7,7 +7,12 @@ import shutil
 from datetime import UTC
 from pathlib import Path
 
-from tarkov_agent.domain.models import EvidenceKind, EvidenceReference, RaidRecord, TimelineEvent
+from tarkov_agent.domain.models import (
+    EvidenceKind,
+    EvidenceReference,
+    RaidRecord,
+    TimelineEvent,
+)
 
 
 class RaidPackageError(RuntimeError):
@@ -52,6 +57,7 @@ class RaidPackageBuilder:
             "evidence/logs",
             "evidence/recordings",
             "evidence/screenshots",
+            "evidence/clips",
             "evidence/exports",
             "analysis",
         ):
@@ -68,9 +74,15 @@ class RaidPackageBuilder:
         _atomic_write(manifest_path, raid.model_dump_json(indent=2))
         return manifest_path
 
-    def append_timeline_event(self, raid: RaidRecord, event: TimelineEvent) -> Path:
+    def append_timeline_event(
+        self,
+        raid: RaidRecord,
+        event: TimelineEvent,
+    ) -> Path:
         if event.raid_id != raid.id:
-            raise RaidPackageError("Timeline event does not belong to the supplied raid")
+            raise RaidPackageError(
+                "Timeline event does not belong to the supplied raid"
+            )
         timeline_path = raid.data_root / "timeline.jsonl"
         with timeline_path.open("a", encoding="utf-8", newline="\n") as handle:
             handle.write(event.model_dump_json())
@@ -96,6 +108,7 @@ class RaidPackageBuilder:
                 EvidenceKind.LOG: "logs",
                 EvidenceKind.RECORDING: "recordings",
                 EvidenceKind.SCREENSHOT: "screenshots",
+                EvidenceKind.CLIP: "clips",
                 EvidenceKind.EXPORT: "exports",
             }
             subfolder = folder_by_kind.get(kind, "exports")
@@ -104,7 +117,10 @@ class RaidPackageBuilder:
             destination = destination_dir / source_path.name
             counter = 1
             while destination.exists():
-                destination = destination_dir / f"{source_path.stem}-{counter}{source_path.suffix}"
+                destination = (
+                    destination_dir
+                    / f"{source_path.stem}-{counter}{source_path.suffix}"
+                )
                 counter += 1
             shutil.copy2(source_path, destination)
 
@@ -115,11 +131,17 @@ class RaidPackageBuilder:
             size_bytes=destination.stat().st_size,
             metadata=metadata or {},
         )
-        updated = raid.model_copy(update={"evidence": [*raid.evidence, evidence]})
+        updated = raid.model_copy(
+            update={"evidence": [*raid.evidence, evidence]}
+        )
         self.write_manifest(updated)
         return updated, evidence
 
-    def write_summary(self, raid: RaidRecord, summary: dict[str, object]) -> Path:
+    def write_summary(
+        self,
+        raid: RaidRecord,
+        summary: dict[str, object],
+    ) -> Path:
         path = raid.data_root / "analysis" / "summary.json"
         _atomic_write(path, json.dumps(summary, indent=2, default=str))
         return path
