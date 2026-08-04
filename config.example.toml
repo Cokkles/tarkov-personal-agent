@@ -58,6 +58,20 @@ context_difference_threshold = 0.35
 minimum_independent_raids = 3
 maximum_history = 200
 
+[truth]
+enabled = true
+seed_default_sources = true
+minimum_verification_score = 0.72
+minimum_supporting_citations = 1
+claim_review_interval_days = 30
+source_review_interval_days = 30
+stale_grace_days = 14
+
+[recommendations]
+enabled = true
+minimum_plan_confidence = 0.40
+maximum_history = 200
+
 [runtime]
 auto_create_raid_package = true
 auto_complete_raid_on_end = false
