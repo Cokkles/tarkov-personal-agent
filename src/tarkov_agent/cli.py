@@ -14,12 +14,21 @@ import uvicorn
 from tarkov_agent.api.application import create_app
 from tarkov_agent.app_context import AgentContext, build_context
 from tarkov_agent.config import AppSettings
+from tarkov_agent.domain.recommendations import (
+    RecommendationPurpose,
+    RecommendationRequest,
+    RiskPosture,
+)
 from tarkov_agent.domain.source_truth import GameScope, MechanicsQuery
 from tarkov_agent.integrations.obs import ObsIntegrationError, build_recording_controller
 from tarkov_agent.observers.logs import LogTailObserver
 from tarkov_agent.observers.process import ProcessObserver
 from tarkov_agent.services.diagnostics import DiagnosticCaptureService
 from tarkov_agent.services.ppe import PPEDisabledError
+from tarkov_agent.services.recommendations import (
+    RecommendationDisabledError,
+    recommendation_to_markdown,
+)
 from tarkov_agent.services.source_truth import SourceTruthDisabledError
 
 _CONFIG_TEMPLATE = """# Tarkov Personal Agent configuration
@@ -88,6 +97,11 @@ claim_review_interval_days = 30
 source_review_interval_days = 30
 stale_grace_days = 14
 
+[recommendations]
+enabled = true
+minimum_plan_confidence = 0.40
+maximum_history = 200
+
 [runtime]
 auto_create_raid_package = true
 auto_complete_raid_on_end = false
@@ -124,6 +138,7 @@ def _command_doctor(args: argparse.Namespace) -> int:
         settings.process.poll_interval_seconds,
     ).snapshot()
     profile = context.ppe.current()
+    latest_plan = context.recommendations.latest()
     report: dict[str, object] = {
         "data_root": str(settings.paths.data_root),
         "database_path": str(settings.paths.database_path),
@@ -156,6 +171,14 @@ def _command_doctor(args: argparse.Namespace) -> int:
             "profile_root": str(settings.paths.ppe_root),
         },
         "source_truth": context.truth.status(),
+        "recommendations": {
+            "enabled": settings.recommendations.enabled,
+            "latest_plan_id": str(latest_plan.id) if latest_plan is not None else None,
+            "latest_can_recommend": (
+                latest_plan.can_recommend if latest_plan is not None else None
+            ),
+            "output_root": str(settings.paths.recommendations_root),
+        },
         "obs": {"enabled": settings.obs.enabled},
     }
 
@@ -308,6 +331,41 @@ def _command_truth_export(args: argparse.Namespace) -> int:
     return 0
 
 
+def _command_recommend(args: argparse.Namespace) -> int:
+    context = _context(args.config)
+    request = RecommendationRequest(
+        game=GameScope(args.game),
+        patch_version=args.patch,
+        objective=args.objective,
+        map_name=args.map,
+        character_type=args.character,
+        group_size=args.group_size,
+        purpose=RecommendationPurpose(args.purpose),
+        risk_posture=RiskPosture(args.risk),
+        mechanic_keys=args.mechanic,
+        constraints=args.constraint,
+        notes=args.notes,
+    )
+    try:
+        plan = context.recommendations.generate(request)
+    except RecommendationDisabledError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    content = (
+        recommendation_to_markdown(plan)
+        if args.format == "markdown"
+        else plan.model_dump_json(indent=2)
+    )
+    if args.output:
+        output = Path(args.output).expanduser().resolve()
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(content, encoding="utf-8")
+        print(f"Wrote recommendation plan: {output}")
+    else:
+        print(content, end="" if content.endswith("\n") else "\n")
+    return 0 if plan.can_recommend else 3
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="tarkov-agent",
@@ -401,6 +459,42 @@ def _parser() -> argparse.ArgumentParser:
     )
     truth_export_parser.add_argument("--output")
     truth_export_parser.set_defaults(func=_command_truth_export)
+
+    recommendation_parser = subparsers.add_parser(
+        "recommend",
+        help="Generate a traceable primary and fallback plan",
+    )
+    recommendation_parser.add_argument("objective")
+    recommendation_parser.add_argument(
+        "--game",
+        choices=[scope.value for scope in GameScope],
+        default=GameScope.TARKOV.value,
+    )
+    recommendation_parser.add_argument("--patch")
+    recommendation_parser.add_argument("--map")
+    recommendation_parser.add_argument("--character", default="PMC")
+    recommendation_parser.add_argument("--group-size")
+    recommendation_parser.add_argument(
+        "--purpose",
+        choices=[item.value for item in RecommendationPurpose],
+        default=RecommendationPurpose.PROGRESSION.value,
+    )
+    recommendation_parser.add_argument(
+        "--risk",
+        choices=[item.value for item in RiskPosture],
+        default=RiskPosture.BALANCED.value,
+    )
+    recommendation_parser.add_argument("--mechanic", action="append", default=[])
+    recommendation_parser.add_argument("--constraint", action="append", default=[])
+    recommendation_parser.add_argument("--notes")
+    recommendation_parser.add_argument(
+        "--format",
+        choices=["markdown", "json"],
+        default="markdown",
+    )
+    recommendation_parser.add_argument("--output")
+    recommendation_parser.add_argument("--config")
+    recommendation_parser.set_defaults(func=_command_recommend)
     return parser
 
 
