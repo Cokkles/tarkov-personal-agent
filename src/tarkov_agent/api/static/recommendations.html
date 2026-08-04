@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tarkov Recommendation Engine</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,Segoe UI,sans-serif;background:#0b1015;color:#e8eef5}body{margin:0}header{padding:18px 24px;border-bottom:1px solid #27313c;background:#111820}main{display:grid;grid-template-columns:minmax(300px,430px) 1fr;gap:18px;padding:20px}.card{background:#111820;border:1px solid #27313c;border-radius:12px;padding:18px}label{display:block;margin:12px 0 5px;color:#aebdca;font-size:.9rem}input,select,textarea,button{width:100%;box-sizing:border-box;border-radius:8px;border:1px solid #344351;background:#0b1117;color:#eef5fb;padding:10px}textarea{min-height:86px;resize:vertical}button{margin-top:14px;background:#326da8;border-color:#4b88c5;font-weight:700;cursor:pointer}button:hover{background:#3d7fbe}.muted{color:#91a0ae}.plan{display:grid;gap:14px}.candidate{padding:15px;border:1px solid #344351;border-radius:10px;background:#0d141b}.score{display:flex;gap:16px;flex-wrap:wrap;color:#9fc2df}.ok{color:#78d79d}.warn{color:#f0c674}.blocked{color:#f28b82}ul,ol{line-height:1.55}code{background:#1a2530;padding:2px 5px;border-radius:4px}@media(max-width:900px){main{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><strong>Tarkov Personal Agent — Recommendation Engine</strong> <span class="muted">| <a href="/" style="color:#8fc7ff">Raid Review</a> · <a href="/ppe" style="color:#8fc7ff">PPE</a> · <a href="/truth" style="color:#8fc7ff">Source of Truth</a></span></header>
+<main>
+<section class="card">
+<h2>Generate a plan</h2>
+<label for="objective">Objective</label><textarea id="objective" placeholder="Example: Complete a safe Scav loot run and extract transferable hideout items."></textarea>
+<label for="map">Map</label><input id="map" placeholder="Customs">
+<label for="character">Character</label><select id="character"><option value="PMC">PMC</option><option value="Scav">Scav</option></select>
+<label for="purpose">Purpose</label><select id="purpose"><option value="progression">Progression</option><option value="training">Training experiment</option></select>
+<label for="risk">Risk posture</label><select id="risk"><option value="low">Low</option><option value="balanced" selected>Balanced</option><option value="high">High</option></select>
+<label for="patch">Patch version (only when a mechanic requires it)</label><input id="patch" placeholder="Optional">
+<label for="mechanics">Additional hard mechanic keys</label><textarea id="mechanics" placeholder="One Source-of-Truth key per line"></textarea>
+<label for="constraints">Constraints</label><textarea id="constraints" placeholder="One constraint per line"></textarea>
+<button id="generate">Generate recommendation</button>
+<p id="message" class="muted"></p>
+</section>
+<section class="card">
+<h2>Plan</h2>
+<div id="result" class="plan"><p class="muted">Generate a plan to compare mechanics, PPE evidence, objective fit, and risk.</p></div>
+</section>
+</main>
+<script>
+const lines = id => document.getElementById(id).value.split(/\r?\n/).map(v=>v.trim()).filter(Boolean);
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function renderEvaluation(title, evaluation){
+  if(!evaluation) return `<div class="candidate"><h3>${esc(title)}</h3><p class="blocked">No eligible candidate.</p></div>`;
+  const mechanics = evaluation.mechanic_checks.map(check => `<li><code>${esc(check.requirement.key)}</code>: ${esc(check.resolution.resolution)} — ${esc(check.resolution.reason)}</li>`).join('');
+  const steps = evaluation.candidate.steps.map(step => `<li>${esc(step)}</li>`).join('');
+  return `<div class="candidate"><h3>${esc(title)}: ${esc(evaluation.candidate.title)}</h3><p>${esc(evaluation.candidate.summary)}</p><div class="score"><span>Total ${evaluation.total_score.toFixed(3)}</span><span>Confidence ${evaluation.confidence.toFixed(3)}</span><span>Player fit ${evaluation.player_fit_score.toFixed(3)}</span><span>Risk fit ${evaluation.risk_fit_score.toFixed(3)}</span></div><h4>Steps</h4><ol>${steps}</ol>${mechanics?`<h4>Mechanics</h4><ul>${mechanics}</ul>`:''}</div>`;
+}
+function render(plan){
+  const state = plan.can_recommend ? '<span class="ok">Recommendation permitted</span>' : `<span class="warn">Caution / refusal: ${esc(plan.refusal_reason || 'insufficient support')}</span>`;
+  const tasks = plan.research_tasks.map(item=>`<li>${esc(item)}</li>`).join('');
+  const assumptions = plan.assumptions.map(item=>`<li>${esc(item)}</li>`).join('');
+  document.getElementById('result').innerHTML = `<p>${state}</p>${renderEvaluation('Primary',plan.primary)}${renderEvaluation('Fallback',plan.fallback)}<div class="candidate"><h3>Assumptions</h3><ul>${assumptions||'<li>None recorded.</li>'}</ul><h3>Research tasks</h3><ul>${tasks||'<li>No blocking research tasks.</li>'}</ul><p><a href="/api/recommendations/export/markdown" style="color:#8fc7ff">Export Markdown</a> · <a href="/api/recommendations/export/json" style="color:#8fc7ff">Export JSON</a></p></div>`;
+}
+document.getElementById('generate').addEventListener('click', async () => {
+  const message = document.getElementById('message');
+  const objective = document.getElementById('objective').value.trim();
+  if(!objective){message.textContent='Objective is required.';return;}
+  message.textContent='Generating…';
+  const payload={game:'tarkov',objective,map_name:document.getElementById('map').value.trim()||null,character_type:document.getElementById('character').value,purpose:document.getElementById('purpose').value,risk_posture:document.getElementById('risk').value,patch_version:document.getElementById('patch').value.trim()||null,mechanic_keys:lines('mechanics'),constraints:lines('constraints')};
+  const response=await fetch('/api/recommendations/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const data=await response.json();
+  if(!response.ok){message.textContent=data.detail||'Generation failed.';return;}
+  message.textContent='Plan generated and saved locally.';render(data);
+});
+fetch('/api/recommendations/latest').then(r=>r.ok?r.json():null).then(data=>{if(data)render(data);});
+</script>
+</body>
+</html>
