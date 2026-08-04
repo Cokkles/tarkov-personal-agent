@@ -40,6 +40,8 @@ host = "127.0.0.1"
 port = 8765
 token = ""
 open_browser = true
+# Add the OBS recording folder here when it is outside data_root.
+# Example: allowed_evidence_roots = ["D:/OBS Recordings"]
 allowed_evidence_roots = []
 
 [diagnostics]
@@ -71,6 +73,19 @@ stale_grace_days = 14
 enabled = true
 minimum_plan_confidence = 0.40
 maximum_history = 200
+
+[media]
+enabled = true
+copy_recordings_into_package = false
+file_stability_timeout_seconds = 30.0
+file_stability_poll_seconds = 0.5
+file_stability_checks = 3
+ffprobe_path = "ffprobe"
+ffmpeg_path = "ffmpeg"
+probe_timeout_seconds = 20.0
+clip_timeout_seconds = 180.0
+default_clip_seconds_before = 10.0
+default_clip_seconds_after = 15.0
 
 [runtime]
 auto_create_raid_package = true
