@@ -7,13 +7,13 @@ The project combines four systems:
 1. **Source of Truth** — patch-aware, source-ranked game knowledge.
 2. **Raid Companion** — passive log monitoring, OBS recording control, event markers, screenshots, and raid packaging.
 3. **Personal Playstyle Engine (PPE)** — evidence-based analysis of objectives, encounters, decisions, strengths, limitations, and strategy fit.
-4. **Recommendation Engine** — context-aware guidance based on current mechanics, player evidence, raid goals, risk, equipment, and confidence.
+4. **Recommendation Engine** — traceable plans based on verified mechanics, player evidence, objectives, risk, and confidence.
 
 ## Project status
 
-**Phase 4: Source of Truth.**
+**Phase 5: Recommendation Engine.**
 
-The repository contains a runnable local companion, browser raid-review workflow, explainable PPE, and a patch-aware Source-of-Truth registry. Mechanics are stored as ranked, citation-preserving claims with patch applicability, verification scores, conflict detection, review deadlines, and an explicit query refusal contract.
+The repository contains a runnable local companion, browser raid-review workflow, explainable PPE, patch-aware Source-of-Truth registry, and deterministic Recommendation Engine. The engine generates primary and fallback strategies, blocks plans that depend on unresolved mechanics, scores player and risk fit, preserves assumptions and evidence references, and creates controlled training experiments.
 
 No Tarkov log signatures ship enabled yet. Automatic raid detection remains disabled until current redacted samples are validated against false positives. Manual lifecycle controls provide the safe fallback in the meantime.
 
@@ -38,9 +38,10 @@ tarkov-agent serve --config config.toml
 Local interfaces:
 
 ```text
-http://127.0.0.1:8765/        Raid Review
-http://127.0.0.1:8765/ppe     Personal Playstyle Engine
-http://127.0.0.1:8765/truth   Source of Truth
+http://127.0.0.1:8765/                 Raid Review
+http://127.0.0.1:8765/ppe              Personal Playstyle Engine
+http://127.0.0.1:8765/truth            Source of Truth
+http://127.0.0.1:8765/recommendations  Recommendation Engine
 ```
 
 The raid-review application supports manual raid start/end controls, live markers, pending-review selection, multiple encounter records, corrected metadata, review audit history, and Markdown or JSON export. Finalizing a review updates the PPE using only explicit structured evidence.
@@ -59,6 +60,17 @@ tarkov-agent truth-query scav.extracted_loot_transfers --game tarkov --config co
 tarkov-agent truth-review-queue --config config.toml
 ```
 
+Generate a traceable Scav plan:
+
+```powershell
+tarkov-agent recommend `
+  "Extract task and hideout value safely" `
+  --character Scav `
+  --map Customs `
+  --risk low `
+  --config config.toml
+```
+
 To collect a limited redacted log sample for parser research:
 
 ```powershell
@@ -66,6 +78,15 @@ tarkov-agent capture-logs --config config.toml --seconds 180 --label scav-surviv
 ```
 
 Captured diagnostics must still be reviewed manually before sharing or committing.
+
+## Recommendation safeguards
+
+- Required mechanics must resolve through the Source-of-Truth refusal contract.
+- Unknown, stale, disputed, conflicting, or patch-ambiguous mechanics block dependent strategies.
+- Missing PPE evidence remains neutral and low-confidence instead of becoming an inferred trait.
+- Progression plans and controlled training experiments remain separate.
+- Primary, fallback, blocked candidates, assumptions, research tasks, and confidence survive exports.
+- Recommendations are pre-raid or post-raid assistance, not hidden live gameplay automation.
 
 ## Source-of-Truth safeguards
 
@@ -105,9 +126,11 @@ Captured diagnostics must still be reviewed manually before sharing or committin
 - `src/tarkov_agent/ppe/` — profile registry, extractor, weighting engine, and report logic
 - `src/tarkov_agent/domain/source_truth.py` — patch, source, claim, citation, conflict, query, and review models
 - `src/tarkov_agent/services/source_truth.py` — ranking, verification, conflict, review, query, and export logic
+- `src/tarkov_agent/domain/recommendations.py` — recommendation request, candidate, scoring, and output models
+- `src/tarkov_agent/services/recommendations.py` — candidate generation, filtering, scoring, experiments, and exports
 - `migrations/` — versioned SQLite migrations
 - `schemas/` — planned versioned interchange schemas
-- `prompts/` — planned recommendation prompts and output contracts
+- `prompts/` — planned advanced reasoning prompts and output contracts
 - `knowledge-base/` — planned source policies, claim records, and curated notes
 - `tests/` — unit and integration tests
 - `scripts/` — planned development and data-maintenance utilities
@@ -126,6 +149,7 @@ Start with:
 - [`docs/PHASE2_RAID_REVIEW.md`](docs/PHASE2_RAID_REVIEW.md)
 - [`docs/PHASE3_PERSONAL_PLAYSTYLE_ENGINE.md`](docs/PHASE3_PERSONAL_PLAYSTYLE_ENGINE.md)
 - [`docs/PHASE4_SOURCE_OF_TRUTH.md`](docs/PHASE4_SOURCE_OF_TRUTH.md)
+- [`docs/PHASE5_RECOMMENDATION_ENGINE.md`](docs/PHASE5_RECOMMENDATION_ENGINE.md)
 - [`docs/SETUP_AND_SCAV_TEST.md`](docs/SETUP_AND_SCAV_TEST.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
 - [`docs/SAFETY_AND_COMPLIANCE.md`](docs/SAFETY_AND_COMPLIANCE.md)
