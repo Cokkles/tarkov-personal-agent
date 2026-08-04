@@ -97,27 +97,45 @@ Delivered:
 
 Exit condition met: recommendations can query verified mechanics and refuse unresolved claims.
 
-## Phase 5 — Recommendation Engine
+## Phase 5 — Recommendation Engine — Complete
 
-- Candidate strategy generation
-- Hard mechanical constraint filtering through the Source-of-Truth query contract
-- Objective and player-fit scoring
-- Progression versus training recommendations
-- Assumption and confidence reporting
-- Experiment design
+Delivered:
 
-Exit condition: the system produces a primary and fallback plan with traceable mechanics and player evidence.
+- Deterministic PMC, Scav, progression, and training candidate generation
+- Hard mechanical filtering through the Source-of-Truth query contract
+- Explicit blocking for missing, stale, disputed, conflicting, and patch-ambiguous mechanics
+- Objective, player-fit, and risk-posture scoring
+- PPE context preference with global fallback
+- Supporting PPE evidence references and mechanic citations
+- Primary and fallback strategy selection
+- Assumption, confidence, blocker, and research-task reporting
+- Controlled single-variable experiment designs for training requests
+- Local Markdown and JSON history
+- Browser dashboard, local API, and CLI command
+- Cross-platform automated tests
+
+Exit condition met: the system produces a primary and fallback plan with traceable mechanics and player evidence.
 
 ## Phase 6 — Media Assistance
 
-- Recording indexing
-- User marker navigation
-- Optional local transcription
-- Optional scene-change assistance
-- Clip extraction with FFmpeg
+- Reliable OBS output association after file finalization
+- Recording index with canonical path, duration, size, hash, and availability
+- Reference-first storage with optional copy-on-export
+- Marker-to-recording navigation offsets
+- Optional FFmpeg clip extraction around selected markers
 - End-of-raid screenshot workflow
+- Optional local transcription and scene-change assistance
 
-Computer vision and OCR remain optional and must not become prerequisites for core logging.
+Computer vision, OCR, and transcription remain optional and must not become prerequisites for core logging.
+
+## Phase 6.5 — Desktop Companion
+
+- Native Windows launcher and system-tray application
+- Dashboard for agent, Tarkov, OBS, recording, and active-raid status
+- Live marker controls and review queue access
+- Embedded or linked Raid Review, PPE, Source of Truth, and Recommendation views
+- Start-with-Windows and one-click shortcut packaging
+- Existing local service remains the stable backend and web UI remains available for diagnostics
 
 ## Phase 7 — Arena and Squad Extensions
 
@@ -126,6 +144,16 @@ Computer vision and OCR remain optional and must not become prerequisites for co
 - Mechanical practice reports
 - Squad-role context
 - Team communication markers
+
+## Phase 8 — Advanced Audiovisual Analysis
+
+- Isolated OBS tracks for game audio, microphone, team communication, and full mix
+- Tarkov-specific sound-event detection
+- Missed-audio-cue analysis
+- Communication masking analysis
+- Visual event detection for brief distant movement and partially obscured contacts
+- Cognitive-load modeling that separates objective cues from what the player could reasonably perceive
+- Dispute and correction workflow for false positives, missed events, bad timestamps, and mistaken conclusions
 
 ## Parallel validation track — Tarkov log signatures
 
@@ -142,5 +170,5 @@ This track remains deliberately separate from feature phases:
 - Cloud hosting
 - Multi-user accounts
 - Mobile application
-- Real-time tactical guidance
-- Automatic video understanding at full-raid scale
+- Hidden real-time tactical direction
+- Full-raid video understanding as a mandatory dependency
