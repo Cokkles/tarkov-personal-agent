@@ -46,8 +46,16 @@ class RecommendationRequest(BaseModel):
 
     @model_validator(mode="after")
     def normalize_lists(self) -> RecommendationRequest:
-        self.mechanic_keys = list(dict.fromkeys(item.strip() for item in self.mechanic_keys if item.strip()))
-        self.constraints = list(dict.fromkeys(item.strip() for item in self.constraints if item.strip()))
+        self.mechanic_keys = list(
+            dict.fromkeys(
+                item.strip() for item in self.mechanic_keys if item.strip()
+            )
+        )
+        self.constraints = list(
+            dict.fromkeys(
+                item.strip() for item in self.constraints if item.strip()
+            )
+        )
         return self
 
 
@@ -65,9 +73,15 @@ class StrategyCandidate(BaseModel):
 
     @model_validator(mode="after")
     def validate_fit_weights(self) -> StrategyCandidate:
-        invalid = [key for key, value in self.fit_weights.items() if value < -1.0 or value > 1.0]
+        invalid = [
+            key
+            for key, value in self.fit_weights.items()
+            if value < -1.0 or value > 1.0
+        ]
         if invalid:
-            raise ValueError(f"Fit weights must be between -1 and 1: {sorted(invalid)}")
+            raise ValueError(
+                f"Fit weights must be between -1 and 1: {sorted(invalid)}"
+            )
         return self
 
 
