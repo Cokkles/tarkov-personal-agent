@@ -29,6 +29,7 @@ class EvidenceKind(StrEnum):
     LOG = "log"
     RECORDING = "recording"
     SCREENSHOT = "screenshot"
+    CLIP = "clip"
     MARKER = "marker"
     USER_NOTE = "user_note"
     EXPORT = "export"
