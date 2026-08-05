@@ -22,7 +22,7 @@ if (-not (Test-Path $Python)) {
 }
 
 Write-Host "Installing Desktop Companion dependencies..."
-& $Python -m pip install -e "$ProjectRoot[desktop]"
+& $Python -m pip install -e "${ProjectRoot}[desktop]"
 if ($LASTEXITCODE -ne 0) {
     throw "Desktop dependency installation failed with exit code $LASTEXITCODE"
 }
