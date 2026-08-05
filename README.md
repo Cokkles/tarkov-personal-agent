@@ -2,21 +2,22 @@
 
 A local-first, passive companion and analytics platform for **Escape from Tarkov** and **Escape from Tarkov: Arena**.
 
-The project combines five systems:
+The project combines six systems:
 
 1. **Source of Truth** — patch-aware, source-ranked game knowledge.
 2. **Raid Companion** — passive log monitoring, OBS recording control, event markers, screenshots, and raid packaging.
 3. **Personal Playstyle Engine (PPE)** — evidence-based analysis of objectives, encounters, decisions, strengths, limitations, and strategy fit.
 4. **Recommendation Engine** — traceable plans based on verified mechanics, player evidence, objectives, risk, and confidence.
 5. **Media Assistance** — finalized recording indexing, marker navigation, evidence integrity, and optional local clips.
+6. **Desktop Companion** — a native dashboard, system tray, manual raid controls, markers, and one-click workspace access.
 
 ## Project status
 
-**Phase 6: Media Assistance.**
+**Phase 6.5: Desktop Companion.**
 
-The repository contains a runnable local companion, browser raid-review workflow, explainable PPE, patch-aware Source-of-Truth registry, deterministic Recommendation Engine, and reference-first media manager. OBS recordings are indexed only after their files stabilize, preserving final size and SHA-256 metadata. Timeline events and Stream Deck markers are exposed as recording seek offsets, while optional FFmpeg clips can be generated around selected moments.
+The repository contains a runnable local service, native desktop dashboard, browser raid-review workflow, explainable PPE, patch-aware Source-of-Truth registry, deterministic Recommendation Engine, and reference-first media manager. The desktop app can start or connect to the service, show raid and OBS status, control the manual raid lifecycle, create the seven validated markers, and open every detailed browser workspace.
 
-No Tarkov log signatures ship enabled yet. Automatic raid detection remains disabled until current redacted samples are validated against false positives. Manual lifecycle controls provide the safe fallback in the meantime.
+No Tarkov log signatures ship enabled yet. Automatic raid detection remains disabled until current redacted samples are validated against false positives. Manual lifecycle controls remain the safe fallback.
 
 ## Quick start
 
@@ -30,23 +31,69 @@ tarkov-agent init --output config.toml
 tarkov-agent doctor --config config.toml
 ```
 
-After configuring OBS WebSocket and any local log paths, launch the companion:
+Run only the local service and browser applications:
 
 ```powershell
 tarkov-agent serve --config config.toml
 ```
 
-Local interfaces:
+Install the native Desktop Companion and create a Windows desktop shortcut:
 
-```text
-http://127.0.0.1:8765/                 Raid Review
-http://127.0.0.1:8765/ppe              Personal Playstyle Engine
-http://127.0.0.1:8765/truth            Source of Truth
-http://127.0.0.1:8765/recommendations  Recommendation Engine
-http://127.0.0.1:8765/media            Media Assistance
+```powershell
+.\scripts\install_desktop_companion.ps1 `
+  -ConfigPath "C:\TarkovPersonalAgent\TarkovPersonalAgentCode\config.toml"
 ```
 
-The raid-review application supports manual raid start/end controls, live markers, pending-review selection, multiple encounter records, corrected metadata, review audit history, and Markdown or JSON export. Finalizing a review updates the PPE using only explicit structured evidence.
+Or install and run it manually:
+
+```powershell
+python -m pip install -e ".[desktop]"
+tarkov-agent-desktop --config config.toml
+```
+
+The desktop starts the local service automatically when needed. When an independently launched service is already running, the desktop connects to it without claiming ownership.
+
+## Interfaces
+
+```text
+Native application                         Tarkov Personal Agent Desktop
+http://127.0.0.1:8765/                     Raid Review
+http://127.0.0.1:8765/ppe                  Personal Playstyle Engine
+http://127.0.0.1:8765/truth                Source of Truth
+http://127.0.0.1:8765/recommendations      Recommendation Engine
+http://127.0.0.1:8765/media                Media Assistance
+http://127.0.0.1:8765/docs                 API documentation
+```
+
+The native dashboard provides:
+
+- service status and ownership-aware start/stop controls;
+- current lifecycle, active raid, OBS, review queue, PPE, and parser-rule status;
+- manual Start Raid, End Raid, and Abort Raid controls;
+- seven live marker buttons;
+- system-tray operation;
+- one-click access to all detailed browser workspaces.
+
+## Desktop configuration
+
+```toml
+[desktop]
+enabled = true
+auto_start_service = true
+minimize_to_tray = true
+stop_service_on_exit = true
+poll_interval_seconds = 2.0
+request_timeout_seconds = 1.5
+service_start_timeout_seconds = 15.0
+```
+
+Desktop logs are written under:
+
+```text
+<data_root>/desktop/desktop.log
+```
+
+The Windows installer script can create either a normal desktop shortcut or a Startup-folder shortcut. The launcher always points to the project virtual environment and the selected `config.toml`.
 
 ## Recording setup
 
@@ -67,7 +114,9 @@ Reference-first storage is the default: the raid package records the final path,
 
 `ffprobe` and `ffmpeg` are optional. Indexing, hashing, and marker navigation work without them; media probing and clip extraction require the corresponding executable to be available on `PATH` or configured explicitly.
 
-Recalculate the profile from stored evidence:
+## Useful commands
+
+Recalculate the profile:
 
 ```powershell
 tarkov-agent ppe-rebuild --config config.toml
@@ -92,7 +141,7 @@ tarkov-agent recommend `
   --config config.toml
 ```
 
-To collect a limited redacted log sample for parser research:
+Collect a limited redacted log sample:
 
 ```powershell
 tarkov-agent capture-logs --config config.toml --seconds 180 --label scav-survived
@@ -100,43 +149,39 @@ tarkov-agent capture-logs --config config.toml --seconds 180 --label scav-surviv
 
 Captured diagnostics must still be reviewed manually before sharing or committing.
 
-## Media safeguards
+## Safeguards
 
-- OBS files are allowed to stabilize before size and SHA-256 are calculated.
+### Desktop
+
+- PySide6 remains an optional dependency; the CLI, API, tests, and browser applications remain headless-capable.
+- The desktop stops only the embedded service instance it owns.
+- Manual lifecycle and marker actions use the established local API.
+- The native application does not introduce a game overlay.
+
+### Media
+
+- OBS files stabilize before size and SHA-256 are calculated.
 - Recording references remain local and are not uploaded.
 - Manual media paths must be under the data root or an explicitly approved evidence root.
 - Full recordings are referenced rather than copied by default.
 - Missing FFmpeg or ffprobe does not break raid logging, review, or PPE processing.
-- Video, OCR, transcription, and computer vision remain optional assistance layers.
 
-## Recommendation safeguards
+### Recommendations
 
 - Required mechanics must resolve through the Source-of-Truth refusal contract.
 - Unknown, stale, disputed, conflicting, or patch-ambiguous mechanics block dependent strategies.
 - Missing PPE evidence remains neutral and low-confidence instead of becoming an inferred trait.
 - Progression plans and controlled training experiments remain separate.
 - Primary, fallback, blocked candidates, assumptions, research tasks, and confidence survive exports.
-- Recommendations are pre-raid or post-raid assistance, not hidden live gameplay automation.
 
-## Source-of-Truth safeguards
+### Source of Truth and PPE
 
-- Only verified, applicable, conflict-free claims return `can_recommend=true`.
+- Only verified, applicable, conflict-free claims can authorize recommendations.
 - Patch-specific values require patch context when several historical values exist.
-- Unknown, draft, disputed, stale, and rejected claims are refused for recommendation use.
-- Source authority and reliability are reduced by missing or overdue review.
-- Citation URLs, locators, revisions, roles, and access times survive exports.
-- Official publisher, officially branded wiki, structured data, primary testing, and community sources remain distinct authority classes.
-- Open conflicts enter the blocking review queue.
-
-## PPE safeguards
-
-- A single raid cannot dominate a dimension.
+- A single raid cannot dominate a PPE dimension.
 - Outcome-only evidence is deliberately low weight.
-- Older evidence decays gradually.
 - Contradictory evidence lowers confidence.
-- Global and contextual estimates coexist.
-- Free-text raid narratives are not silently converted into skill claims.
-- Adaptation guidance is separate from optional deliberate training.
+- Free-text narratives are not silently converted into skill claims.
 - Every changed profile has a version, evidence fingerprint, and audit record.
 
 ## Core principles
@@ -151,8 +196,9 @@ Captured diagnostics must still be reviewed manually before sharing or committin
 
 ## Repository areas
 
-- `docs/` — charter, requirements, architecture, safety, implementation notes, roadmap, and setup guide
-- `src/tarkov_agent/` — Python companion, local API, browser applications, and domain services
+- `docs/` — charter, requirements, architecture, safety, phase guides, roadmap, and setup
+- `src/tarkov_agent/` — Python companion, local API, browser applications, desktop client, and domain services
+- `src/tarkov_agent/desktop/` — native API client, embedded service ownership, and PySide6 dashboard
 - `src/tarkov_agent/ppe/` — profile registry, extractor, weighting engine, and report logic
 - `src/tarkov_agent/domain/source_truth.py` — patch, source, claim, citation, conflict, query, and review models
 - `src/tarkov_agent/services/source_truth.py` — ranking, verification, conflict, review, query, and export logic
@@ -161,11 +207,8 @@ Captured diagnostics must still be reviewed manually before sharing or committin
 - `src/tarkov_agent/domain/media.py` — recording, navigation, clip, and media-index models
 - `src/tarkov_agent/services/media.py` — stabilization, hashing, probing, navigation, and clip extraction
 - `migrations/` — versioned SQLite migrations
-- `schemas/` — planned versioned interchange schemas
-- `prompts/` — planned advanced reasoning prompts and output contracts
-- `knowledge-base/` — planned source policies, claim records, and curated notes
 - `tests/` — unit and integration tests
-- `scripts/` — planned development and data-maintenance utilities
+- `scripts/` — installation, shortcut, development, and maintenance utilities
 
 ## Data boundary
 
@@ -183,6 +226,7 @@ Start with:
 - [`docs/PHASE4_SOURCE_OF_TRUTH.md`](docs/PHASE4_SOURCE_OF_TRUTH.md)
 - [`docs/PHASE5_RECOMMENDATION_ENGINE.md`](docs/PHASE5_RECOMMENDATION_ENGINE.md)
 - [`docs/PHASE6_MEDIA_ASSISTANCE.md`](docs/PHASE6_MEDIA_ASSISTANCE.md)
+- [`docs/PHASE6_5_DESKTOP_COMPANION.md`](docs/PHASE6_5_DESKTOP_COMPANION.md)
 - [`docs/SETUP_AND_SCAV_TEST.md`](docs/SETUP_AND_SCAV_TEST.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
 - [`docs/SAFETY_AND_COMPLIANCE.md`](docs/SAFETY_AND_COMPLIANCE.md)
