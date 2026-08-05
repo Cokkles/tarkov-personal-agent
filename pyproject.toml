@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tarkov-personal-agent"
-version = "0.5.0"
+version = "0.6.0"
 description = "Local-first passive raid companion and personal playstyle analytics platform"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -31,9 +31,17 @@ dev = [
   "types-psutil>=7.0,<8",
   "httpx>=0.27,<1",
 ]
+desktop = [
+  "PySide6>=6.8,<7",
+]
+desktop-build = [
+  "PySide6>=6.8,<7",
+  "pyinstaller>=6.10,<7",
+]
 
 [project.scripts]
 tarkov-agent = "tarkov_agent.cli:main"
+tarkov-agent-desktop = "tarkov_agent.desktop.app:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tarkov_agent"]
@@ -65,5 +73,5 @@ strict = true
 packages = ["tarkov_agent"]
 
 [[tool.mypy.overrides]]
-module = ["obsws_python", "obsws_python.*"]
+module = ["obsws_python", "obsws_python.*", "PySide6", "PySide6.*"]
 ignore_missing_imports = true
