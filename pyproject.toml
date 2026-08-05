@@ -41,6 +41,8 @@ desktop-build = [
 
 [project.scripts]
 tarkov-agent = "tarkov_agent.cli:main"
+
+[project.gui-scripts]
 tarkov-agent-desktop = "tarkov_agent.desktop.app:main"
 
 [tool.hatch.build.targets.wheel]
