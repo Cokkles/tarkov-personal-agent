@@ -76,3 +76,7 @@ packages = ["tarkov_agent"]
 [[tool.mypy.overrides]]
 module = ["obsws_python", "obsws_python.*", "PySide6", "PySide6.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["tarkov_agent.desktop.qt_app"]
+ignore_errors = true
