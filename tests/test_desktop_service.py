@@ -53,10 +53,22 @@ def test_embedded_service_is_started_and_stopped_by_owner(
     )
 
     with (
-        patch("tarkov_agent.desktop.service.build_context", return_value=object()),
-        patch("tarkov_agent.desktop.service.create_app", return_value=object()),
-        patch("tarkov_agent.desktop.service.uvicorn.Config", return_value=object()),
-        patch("tarkov_agent.desktop.service.uvicorn.Server", FakeServer),
+        patch(
+            "tarkov_agent.desktop.service.build_context",
+            return_value=object(),
+        ),
+        patch(
+            "tarkov_agent.desktop.service.create_app",
+            return_value=object(),
+        ),
+        patch(
+            "tarkov_agent.desktop.service.uvicorn.Config",
+            return_value=object(),
+        ),
+        patch(
+            "tarkov_agent.desktop.service.uvicorn.Server",
+            FakeServer,
+        ),
     ):
         assert manager.start() is True
         assert manager.owns_service is True
