@@ -1,4 +1,3 @@
-from collections.abc import Iterator
 from io import BytesIO
 from pathlib import Path
 from typing import Any
