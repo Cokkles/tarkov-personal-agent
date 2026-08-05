@@ -136,14 +136,25 @@ Delivered:
 
 Exit condition met: completed recordings can be indexed after stabilization, preserved by reference or copy, mapped to timeline events, and used for optional local clips without becoming a dependency for raid logging or review.
 
-## Phase 6.5 — Desktop Companion
+## Phase 6.5 — Desktop Companion — Complete
 
-- Native Windows launcher and system-tray application
-- Dashboard for agent, Tarkov, OBS, recording, and active-raid status
-- Live marker controls and review queue access
-- Embedded or linked Raid Review, PPE, Source of Truth, Recommendation, and Media views
-- Start-with-Windows and one-click shortcut packaging
-- Existing local service remains the stable backend and web UI remains available for diagnostics
+Delivered:
+
+- Native PySide6 desktop dashboard
+- One-shortcut embedded local service startup
+- Ownership-aware connection to independently running services
+- Lifecycle, active raid, OBS, review queue, PPE, and parser-rule status
+- Manual Start Raid, End Raid, and Abort Raid controls
+- Seven validated live marker buttons
+- One-click access to Raid Review, PPE, Source of Truth, Recommendations, Media, and API docs
+- Windows system-tray operation
+- Optional start-with-Windows shortcut
+- One-command dependency installation and shortcut creation
+- Local desktop logs and typed desktop-status API
+- Headless-safe optional GUI dependency
+- Cross-platform automated tests for the API client, service ownership, and status route
+
+Exit condition met: one native shortcut can start or connect to the local service, display operational status, control the manual raid lifecycle, create markers, open every workspace, remain in the system tray, and stop only the service instance it owns.
 
 ## Phase 7 — Arena and Squad Extensions
 
