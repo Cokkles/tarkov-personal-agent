@@ -40,6 +40,10 @@ class PathSettings(BaseModel):
     def media_root(self) -> Path:
         return self.data_root / "media"
 
+    @property
+    def desktop_root(self) -> Path:
+        return self.data_root / "desktop"
+
     def ensure_directories(self) -> None:
         self.data_root.mkdir(parents=True, exist_ok=True)
         self.raids_root.mkdir(parents=True, exist_ok=True)
@@ -48,6 +52,7 @@ class PathSettings(BaseModel):
         self.source_truth_root.mkdir(parents=True, exist_ok=True)
         self.recommendations_root.mkdir(parents=True, exist_ok=True)
         self.media_root.mkdir(parents=True, exist_ok=True)
+        self.desktop_root.mkdir(parents=True, exist_ok=True)
 
 
 class ProcessSettings(BaseModel):
@@ -149,6 +154,16 @@ class MediaSettings(BaseModel):
     default_clip_seconds_after: float = Field(default=15.0, gt=0.0, le=600.0)
 
 
+class DesktopSettings(BaseModel):
+    enabled: bool = True
+    auto_start_service: bool = True
+    minimize_to_tray: bool = True
+    stop_service_on_exit: bool = True
+    poll_interval_seconds: float = Field(default=2.0, ge=0.5, le=60.0)
+    request_timeout_seconds: float = Field(default=1.5, gt=0.1, le=30.0)
+    service_start_timeout_seconds: float = Field(default=15.0, gt=0.1, le=120.0)
+
+
 class RuntimeSettings(BaseModel):
     auto_create_raid_package: bool = True
     auto_complete_raid_on_end: bool = False
@@ -175,6 +190,7 @@ class AppSettings(BaseSettings):
     truth: SourceTruthSettings = Field(default_factory=SourceTruthSettings)
     recommendations: RecommendationSettings = Field(default_factory=RecommendationSettings)
     media: MediaSettings = Field(default_factory=MediaSettings)
+    desktop: DesktopSettings = Field(default_factory=DesktopSettings)
     runtime: RuntimeSettings = Field(default_factory=RuntimeSettings)
 
     @model_validator(mode="after")
