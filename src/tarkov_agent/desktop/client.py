@@ -99,7 +99,7 @@ class DesktopApiClient:
         )
         if not isinstance(payload, dict):
             raise DesktopApiError("Marker API returned an unexpected response")
-        return payload
+        return {str(key): value for key, value in payload.items()}
 
     def _request(
         self,
@@ -136,17 +136,18 @@ class DesktopApiClient:
         if not body:
             return None
         try:
-            return json.loads(body.decode("utf-8"))
+            decoded: object = json.loads(body.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise DesktopApiError(
                 "Local agent service returned invalid JSON"
             ) from exc
+        return decoded
 
     @staticmethod
     def _http_error_detail(exc: HTTPError) -> str:
         try:
             body = exc.read()
-            payload = json.loads(body.decode("utf-8"))
+            payload: object = json.loads(body.decode("utf-8"))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             return f"Agent API request failed with HTTP {exc.code}"
         if isinstance(payload, dict) and payload.get("detail"):
