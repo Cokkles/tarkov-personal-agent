@@ -87,6 +87,15 @@ clip_timeout_seconds = 180.0
 default_clip_seconds_before = 10.0
 default_clip_seconds_after = 15.0
 
+[desktop]
+enabled = true
+auto_start_service = true
+minimize_to_tray = true
+stop_service_on_exit = true
+poll_interval_seconds = 2.0
+request_timeout_seconds = 1.5
+service_start_timeout_seconds = 15.0
+
 [runtime]
 auto_create_raid_package = true
 auto_complete_raid_on_end = false
