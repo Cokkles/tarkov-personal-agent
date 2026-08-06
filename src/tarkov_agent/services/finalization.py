@@ -150,15 +150,19 @@ class RaidFinalizationService:
 
     def _run(self, job_id: UUID) -> None:
         job = self.get(job_id)
+
+        def report(stage: FinalizationStage, progress: int, message: str) -> None:
+            self._update(
+                job_id,
+                stage=stage,
+                progress=progress,
+                message=message,
+            )
+
         try:
             self._controls.end_raid(
                 result=job.result,
-                progress_callback=lambda stage, progress, message: self._update(
-                    job_id,
-                    stage=stage,
-                    progress=progress,
-                    message=message,
-                ),
+                progress_callback=report,
             )
         except (ControlConflictError, RuntimeError, OSError) as exc:
             active = self._coordinator.active_raid
