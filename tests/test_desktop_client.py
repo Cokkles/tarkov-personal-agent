@@ -49,19 +49,49 @@ def test_status_request_uses_token_and_parses_model(tmp_path: Path) -> None:
         captured.append(request)
         assert timeout == settings.desktop.request_timeout_seconds
         return FakeResponse(
-            b'{"version":"0.6.0","lifecycle_state":"idle",'
+            b'{"version":"0.10.0","lifecycle_state":"idle",'
             b'"active_raid":null,"review_queue_count":0,'
             b'"automatic_log_rules":0,"obs":{"enabled":false},'
             b'"ppe_enabled":true,"ppe_profile_version":null,'
             b'"source_truth_enabled":true,'
-            b'"recommendations_enabled":true,"media_enabled":true}'
+            b'"recommendations_enabled":true,"media_enabled":true,'
+            b'"finalization":null}'
         )
 
     with patch("tarkov_agent.desktop.client.urlopen", fake_urlopen):
         status = client.status()
 
     assert status.lifecycle_state == "idle"
+    assert status.finalization is None
     assert captured[0].get_header("X-tpa-token") == "desktop-token"
+
+
+def test_end_raid_returns_background_finalization_job(tmp_path: Path) -> None:
+    settings = AppSettings(paths=PathSettings(data_root=tmp_path))
+    client = DesktopApiClient(settings)
+
+    def fake_urlopen(
+        request: Request,
+        timeout: float,
+    ) -> FakeResponse:
+        assert request.full_url.endswith("/api/control/raid/end")
+        return FakeResponse(
+            b'{"id":"11111111-1111-1111-1111-111111111111",'
+            b'"raid_id":"22222222-2222-2222-2222-222222222222",'
+            b'"result":"Survived","stage":"accepted","progress":5,'
+            b'"message":"Raid end accepted",'
+            b'"created_at":"2026-08-06T05:00:00Z",'
+            b'"updated_at":"2026-08-06T05:00:00Z",'
+            b'"completed_at":null,"error":null,'
+            b'"retryable":false,"attempt":1}'
+        )
+
+    with patch("tarkov_agent.desktop.client.urlopen", fake_urlopen):
+        job = client.end_raid(result="Survived")
+
+    assert job.stage.value == "accepted"
+    assert job.progress == 5
+    assert str(job.raid_id) == "22222222-2222-2222-2222-222222222222"
 
 
 def test_marker_request_sends_expected_json(tmp_path: Path) -> None:
