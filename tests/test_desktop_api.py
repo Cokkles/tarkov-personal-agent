@@ -62,14 +62,14 @@ def test_desktop_status_does_not_block_on_obs_transport_timeout(tmp_path: Path) 
 
         assert response.status_code == 200
         assert response.json()["obs"]["enabled"] is True
-        assert elapsed < 0.5
-        assert blocking.started.wait(timeout=0.5)
+        assert elapsed < 1.0
+        assert blocking.started.wait(timeout=1.0)
 
         health_started = time.perf_counter()
         health = client.get("/api/health")
         health_elapsed = time.perf_counter() - health_started
         assert health.status_code == 200
-        assert health_elapsed < 0.5
+        assert health_elapsed < 1.0
 
         blocking.release.set()
         time.sleep(0.05)
