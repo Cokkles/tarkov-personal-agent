@@ -8,6 +8,7 @@ from urllib.request import Request, urlopen
 
 from tarkov_agent.config import AppSettings
 from tarkov_agent.domain.desktop import DesktopStatus
+from tarkov_agent.domain.finalization import FinalizationJob
 from tarkov_agent.domain.models import MarkerCommand, RaidRecord
 
 
@@ -104,13 +105,25 @@ class DesktopApiClient:
         )
         return RaidRecord.model_validate(payload)
 
-    def end_raid(self, *, result: str | None) -> RaidRecord:
+    def end_raid(self, *, result: str | None) -> FinalizationJob:
         payload = self._request(
             "POST",
             "/api/control/raid/end",
             {"result": result},
         )
-        return RaidRecord.model_validate(payload)
+        return FinalizationJob.model_validate(payload)
+
+    def finalization_job(self, job_id: str) -> FinalizationJob:
+        payload = self._request("GET", f"/api/finalization/jobs/{job_id}")
+        return FinalizationJob.model_validate(payload)
+
+    def retry_finalization(self, job_id: str) -> FinalizationJob:
+        payload = self._request(
+            "POST",
+            f"/api/finalization/jobs/{job_id}/retry",
+            {},
+        )
+        return FinalizationJob.model_validate(payload)
 
     def abort_raid(self, *, reason: str | None) -> RaidRecord:
         payload = self._request(
