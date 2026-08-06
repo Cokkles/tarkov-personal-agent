@@ -29,3 +29,20 @@ jobs:
         run: mypy src/tarkov_agent
       - name: Tests
         run: pytest --cov=tarkov_agent --cov-report=term-missing
+
+  streamdeck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: JavaScript syntax
+        run: |
+          node --check streamdeck/com.cokkles.tarkov-personal-agent.sdPlugin/bin/protocol.js
+          node --check streamdeck/com.cokkles.tarkov-personal-agent.sdPlugin/bin/plugin.js
+          node --check streamdeck/com.cokkles.tarkov-personal-agent.sdPlugin/ui/settings.js
+      - name: Stream Deck protocol tests
+        run: node --test streamdeck/tests/*.test.mjs
+      - name: Validate manifest JSON
+        run: node -e "JSON.parse(require('fs').readFileSync('streamdeck/com.cokkles.tarkov-personal-agent.sdPlugin/manifest.json', 'utf8'))"
