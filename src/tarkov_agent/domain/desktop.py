@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
+from tarkov_agent.domain.finalization import FinalizationJob
 from tarkov_agent.domain.models import RaidRecord
 
 
@@ -26,3 +27,4 @@ class DesktopStatus(BaseModel):
     source_truth_enabled: bool
     recommendations_enabled: bool
     media_enabled: bool
+    finalization: FinalizationJob | None = None

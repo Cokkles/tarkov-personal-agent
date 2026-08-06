@@ -42,4 +42,5 @@ def attach_desktop_routes(app: FastAPI, context: AgentContext) -> None:
             source_truth_enabled=context.settings.truth.enabled,
             recommendations_enabled=context.settings.recommendations.enabled,
             media_enabled=context.settings.media.enabled,
+            finalization=context.finalization.latest(),
         )

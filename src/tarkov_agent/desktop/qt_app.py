@@ -65,6 +65,7 @@ class DesktopWindow(
         self._last_obs: str | None = None
         self._last_ppe: int | None = None
         self._last_rules: int | None = None
+        self._last_finalization_token: str | None = None
         self._build_window()
         self._build_tray()
         self._configure_timers()
@@ -193,12 +194,20 @@ class DesktopWindow(
         api.setObjectName("topbarMuted")
         self.version_label = QLabel("v—")
         self.version_label.setObjectName("topbarMuted")
+        phase = QLabel("PHASE 6 · LOCAL INTELLIGENCE")
+        phase.setObjectName("phaseBadge")
         refresh = QPushButton("REFRESH")
         refresh.setObjectName("ghostButton")
         refresh.clicked.connect(self.refresh_all)
-        for widget in (self.service_dot, self.service_label, api, self.version_label):
+        for widget in (
+            self.service_dot,
+            self.service_label,
+            api,
+            self.version_label,
+        ):
             layout.addWidget(widget)
         layout.addStretch(1)
+        layout.addWidget(phase)
         layout.addWidget(refresh)
         return frame
 

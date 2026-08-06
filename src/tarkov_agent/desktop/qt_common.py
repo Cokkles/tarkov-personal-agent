@@ -5,7 +5,14 @@ from collections.abc import Callable
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QRunnable, Qt, Signal, Slot
-from PySide6.QtGui import QBrush, QColor, QLinearGradient, QPainter, QPixmap
+from PySide6.QtGui import (
+    QBrush,
+    QColor,
+    QLinearGradient,
+    QPainter,
+    QPixmap,
+    QRadialGradient,
+)
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -77,7 +84,7 @@ class BackgroundWidget(QWidget):
     def paintEvent(self, event: object) -> None:  # noqa: N802
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        painter.fillRect(self.rect(), QColor("#070b0e"))
+        painter.fillRect(self.rect(), QColor("#06090c"))
         if not self._background.isNull():
             pixmap = self._background.scaled(
                 self.size(),
@@ -89,14 +96,28 @@ class BackgroundWidget(QWidget):
                 (self.height() - pixmap.height()) // 2,
                 pixmap,
             )
+
+        tactical_glow = QRadialGradient(
+            self.width() * 0.77,
+            self.height() * 0.34,
+            max(self.width(), self.height()) * 0.62,
+        )
+        tactical_glow.setColorAt(0.0, QColor(126, 116, 76, 34))
+        tactical_glow.setColorAt(0.48, QColor(61, 76, 60, 18))
+        tactical_glow.setColorAt(1.0, QColor(0, 0, 0, 0))
+        painter.fillRect(self.rect(), QBrush(tactical_glow))
+
         horizontal = QLinearGradient(0, 0, self.width(), 0)
-        horizontal.setColorAt(0.0, QColor(4, 9, 12, 246))
-        horizontal.setColorAt(0.55, QColor(4, 9, 12, 220))
-        horizontal.setColorAt(1.0, QColor(4, 9, 12, 112))
+        horizontal.setColorAt(0.0, QColor(4, 9, 12, 244))
+        horizontal.setColorAt(0.42, QColor(4, 9, 12, 208))
+        horizontal.setColorAt(0.76, QColor(4, 9, 12, 128))
+        horizontal.setColorAt(1.0, QColor(4, 9, 12, 72))
         painter.fillRect(self.rect(), QBrush(horizontal))
+
         vertical = QLinearGradient(0, 0, 0, self.height())
-        vertical.setColorAt(0.0, QColor(0, 0, 0, 35))
-        vertical.setColorAt(1.0, QColor(0, 0, 0, 95))
+        vertical.setColorAt(0.0, QColor(0, 0, 0, 18))
+        vertical.setColorAt(0.58, QColor(0, 0, 0, 36))
+        vertical.setColorAt(1.0, QColor(0, 0, 0, 92))
         painter.fillRect(self.rect(), QBrush(vertical))
         painter.end()
         super().paintEvent(event)  # type: ignore[arg-type]
