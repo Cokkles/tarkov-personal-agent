@@ -57,6 +57,7 @@ class _DesktopObsStatusMonitor:
         return snapshot
 
     def _probe(self) -> None:
+        snapshot: DesktopObsStatus | None = None
         try:
             recording = self._context.recording.status()
             snapshot = DesktopObsStatus(
@@ -80,7 +81,7 @@ class _DesktopObsStatusMonitor:
             )
         finally:
             with self._lock:
-                if "snapshot" in locals():
+                if snapshot is not None:
                     self._snapshot = snapshot
                 self._probe_running = False
 
