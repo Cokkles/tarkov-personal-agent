@@ -56,6 +56,12 @@ class EmbeddedServiceManager:
                 port=self.settings.api.port,
                 log_level="warning",
                 access_log=False,
+                # The desktop is launched with pythonw.exe, where stdout/stderr are
+                # unavailable. Uvicorn's default color formatter probes those streams
+                # during configuration and raises "Unable to configure formatter
+                # 'default'". The application already owns file-based desktop logging,
+                # so the embedded server must not install Uvicorn's console log config.
+                log_config=None,
             )
             self._server = uvicorn.Server(config)
             self._thread = threading.Thread(
