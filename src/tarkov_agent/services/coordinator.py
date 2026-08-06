@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import threading
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
 from tarkov_agent.config import AppSettings
+from tarkov_agent.domain.finalization import FinalizationStage
 from tarkov_agent.domain.media import MediaSource
 from tarkov_agent.domain.models import (
     Game,
@@ -32,6 +35,8 @@ from tarkov_agent.services.media import (
 from tarkov_agent.services.packages import RaidPackageBuilder
 from tarkov_agent.storage.database import RaidRepository
 
+FinalizationProgressCallback = Callable[[FinalizationStage, int, str], None]
+
 
 class RaidCoordinator:
     """Coordinates lifecycle changes without reading or influencing game state."""
@@ -53,13 +58,15 @@ class RaidCoordinator:
         self.media = media
         self.lifecycle = RaidLifecycle()
         self.active_raid: RaidRecord | None = None
+        self._lock = threading.RLock()
 
     def restore_active_raid(self, raid: RaidRecord) -> None:
-        if raid.state is not RaidState.IN_RAID:
-            raise ValueError("Only an in-raid record can be restored as active")
-        self.lifecycle = RaidLifecycle(state=raid.state)
-        self.active_raid = raid
-        self.markers.activate(raid)
+        with self._lock:
+            if raid.state is not RaidState.IN_RAID:
+                raise ValueError("Only an in-raid record can be restored as active")
+            self.lifecycle = RaidLifecycle(state=raid.state)
+            self.active_raid = raid
+            self.markers.activate(raid)
 
     def handle_process_snapshot(
         self,
@@ -89,6 +96,25 @@ class RaidCoordinator:
         occurred_at: datetime | None = None,
         reason: str | None = None,
         payload: dict[str, Any] | None = None,
+        progress_callback: FinalizationProgressCallback | None = None,
+    ) -> StateTransition:
+        with self._lock:
+            return self._handle_signal(
+                signal,
+                occurred_at=occurred_at,
+                reason=reason,
+                payload=payload,
+                progress_callback=progress_callback,
+            )
+
+    def _handle_signal(
+        self,
+        signal: RaidSignal,
+        *,
+        occurred_at: datetime | None,
+        reason: str | None,
+        payload: dict[str, Any] | None,
+        progress_callback: FinalizationProgressCallback | None,
     ) -> StateTransition:
         timestamp = occurred_at or datetime.now(UTC)
         transition = self.lifecycle.apply(
@@ -101,7 +127,18 @@ class RaidCoordinator:
         if signal is RaidSignal.RAID_STARTED:
             self._start_raid(timestamp, details, transition)
         elif signal is RaidSignal.RAID_ENDED:
-            self._end_raid(timestamp, details, transition)
+            self._end_raid(
+                timestamp,
+                details,
+                transition,
+                progress_callback=progress_callback,
+            )
+            self._report_progress(
+                progress_callback,
+                FinalizationStage.QUEUING_REVIEW,
+                90,
+                "Preparing post-raid review and evidence references",
+            )
             if self.settings.runtime.auto_complete_raid_on_end:
                 completion = self.lifecycle.apply(
                     RaidSignal.REVIEW_COMPLETED,
@@ -190,6 +227,8 @@ class RaidCoordinator:
         timestamp: datetime,
         payload: dict[str, Any],
         transition: StateTransition,
+        *,
+        progress_callback: FinalizationProgressCallback | None,
     ) -> None:
         raid = self._require_active_raid()
         result = self._optional_text(payload.get("result")) or raid.result
@@ -204,11 +243,23 @@ class RaidCoordinator:
         self.markers.activate(raid)
         self._append_transition_event(raid, transition)
         self._persist_active()
+        self._report_progress(
+            progress_callback,
+            FinalizationStage.RAID_ENDED,
+            15,
+            "Raid record closed; background finalization is continuing",
+        )
 
         if (
             self.settings.obs.enabled
             and self.settings.obs.stop_recording_on_raid_end
         ):
+            self._report_progress(
+                progress_callback,
+                FinalizationStage.STOPPING_RECORDING,
+                30,
+                "Stopping OBS recording and waiting for the output path",
+            )
             try:
                 status = self.recording.stop()
                 self._append_system_event(
@@ -218,7 +269,19 @@ class RaidCoordinator:
                     timestamp,
                     {"output_path": status.output_path},
                 )
-                self._finalize_recording(status, timestamp)
+                self._report_progress(
+                    progress_callback,
+                    FinalizationStage.INDEXING_MEDIA,
+                    55,
+                    "Stabilizing and indexing the recording",
+                )
+                media_message = self._finalize_recording(status, timestamp)
+                self._report_progress(
+                    progress_callback,
+                    FinalizationStage.INDEXING_MEDIA,
+                    80,
+                    media_message,
+                )
             except ObsIntegrationError as exc:
                 self._append_system_event(
                     self._require_active_raid(),
@@ -227,6 +290,12 @@ class RaidCoordinator:
                     timestamp,
                     {"error": str(exc)},
                 )
+                self._report_progress(
+                    progress_callback,
+                    FinalizationStage.INDEXING_MEDIA,
+                    80,
+                    "OBS stop failed; review will retain a warning for recovery",
+                )
 
         self._persist_active()
 
@@ -234,7 +303,7 @@ class RaidCoordinator:
         self,
         status: RecordingStatus,
         timestamp: datetime,
-    ) -> None:
+    ) -> str:
         raid = self._require_active_raid()
         if not status.output_path:
             self._append_system_event(
@@ -245,7 +314,7 @@ class RaidCoordinator:
                 {},
                 confidence=0.8,
             )
-            return
+            return "OBS returned no recording path; review remains available"
         if self.media is None:
             self._append_system_event(
                 raid,
@@ -255,7 +324,7 @@ class RaidCoordinator:
                 {"output_path": status.output_path},
                 confidence=0.8,
             )
-            return
+            return "Media indexing is unavailable; recording path was preserved"
         try:
             updated, asset = self.media.index_recording(
                 raid.id,
@@ -280,7 +349,7 @@ class RaidCoordinator:
                     "error": str(exc),
                 },
             )
-            return
+            return "Recording indexing finished with a recoverable warning"
         self.active_raid = updated
         self.markers.activate(updated)
         self._append_system_event(
@@ -298,6 +367,7 @@ class RaidCoordinator:
                 "duration_seconds": asset.duration_seconds,
             },
         )
+        return "Recording indexed and evidence reference saved"
 
     def _queue_review(self, transition: StateTransition) -> None:
         raid = self._require_active_raid().model_copy(
@@ -436,6 +506,16 @@ class RaidCoordinator:
         if self.active_raid is None:
             raise RuntimeError("No raid is currently active")
         return self.active_raid
+
+    @staticmethod
+    def _report_progress(
+        callback: FinalizationProgressCallback | None,
+        stage: FinalizationStage,
+        progress: int,
+        message: str,
+    ) -> None:
+        if callback is not None:
+            callback(stage, progress, message)
 
     @staticmethod
     def _optional_text(value: Any) -> str | None:
