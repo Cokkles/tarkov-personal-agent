@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import ctypes
 import logging
 import sys
@@ -43,15 +44,13 @@ def _show_native_error(message: str) -> None:
     print(message, file=sys.stderr)
     if sys.platform != "win32":
         return
-    try:
+    with contextlib.suppress(Exception):
         ctypes.windll.user32.MessageBoxW(  # type: ignore[attr-defined]
             0,
             message,
             "Tarkov Personal Agent — Startup Error",
             0x10,
         )
-    except Exception:
-        pass
 
 
 def _report_startup_failure(message: str, exc: BaseException) -> None:
