@@ -2,8 +2,14 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QFormLayout, QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton,
-    QVBoxLayout, QWidget,
+    QFormLayout,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
 )
 
 try:
@@ -12,10 +18,94 @@ except ImportError:  # pragma: no cover
     QWebEngineView = None  # type: ignore[assignment,misc]
 
 
+_FEATURE_MODULES: dict[str, tuple[tuple[str, str, str, str], ...]] = {
+    "PERSONAL PLAYSTYLE ENGINE": (
+        (
+            "PROFILE SNAPSHOT",
+            "Native dimension scores, confidence, evidence volume, and context splits.",
+            "FOUNDATION READY",
+            "ready",
+        ),
+        (
+            "TREND ANALYSIS",
+            "Raid-over-raid movement, regression warnings, and confidence growth.",
+            "PHASE 6",
+            "next",
+        ),
+        (
+            "COACHING FOCUS",
+            "Actionable practice targets grounded in verified PPE evidence.",
+            "PLANNED",
+            "planned",
+        ),
+    ),
+    "MEDIA INTELLIGENCE": (
+        (
+            "RECORDING INDEX",
+            "Local source recordings, probe metadata, hashes, and availability status.",
+            "FOUNDATION READY",
+            "ready",
+        ),
+        (
+            "EVIDENCE REDUCTION",
+            "Marker-centered clips, screenshots, audio excerpts, and upload profiles.",
+            "UP NEXT",
+            "next",
+        ),
+        (
+            "ANALYSIS QUEUE",
+            "Processing progress, failures, retry controls, and evidence package history.",
+            "PLANNED",
+            "planned",
+        ),
+    ),
+    "TASKS & OBJECTIVES": (
+        (
+            "SESSION PLAN",
+            "Prioritized raid goals based on tasks, hideout needs, and recent performance.",
+            "PLANNED",
+            "planned",
+        ),
+        (
+            "QUEST TRACKING",
+            "Progress, required items, map overlap, and route-efficient objective grouping.",
+            "PLANNED",
+            "planned",
+        ),
+        (
+            "HIDEOUT NEEDS",
+            "Materials, quantities, upgrade dependencies, and keep-or-sell guidance.",
+            "PLANNED",
+            "planned",
+        ),
+    ),
+    "MAP INTELLIGENCE": (
+        (
+            "RAID ROUTES",
+            "Actual path reconstruction with markers, encounters, and extraction timing.",
+            "PLANNED",
+            "planned",
+        ),
+        (
+            "ENCOUNTER LAYERS",
+            "Combat locations, sight lines, audio cues, and positional review overlays.",
+            "PLANNED",
+            "planned",
+        ),
+        (
+            "PERSONAL HEATMAPS",
+            "Survival, deaths, loot, route preference, and high-risk area trends.",
+            "PLANNED",
+            "planned",
+        ),
+    ),
+}
+
+
 class OperationsCenterPagesMixin:
     def _dashboard_page(self) -> QWidget:
         page, layout = self._scroll_page()
-        hero = self._panel("CURRENT STATUS", "heroPanel")
+        hero = self._panel("OPERATION STATUS", "heroPanel")
         grid = QGridLayout()
         lifecycle = self._metric("LIFECYCLE")
         self.lifecycle_value = lifecycle.findChild(QLabel, "metricValue")
@@ -38,9 +128,24 @@ class OperationsCenterPagesMixin:
         layout.addWidget(hero)
 
         controls = QHBoxLayout()
-        self.start_raid_button = self._action("▷  START RAID", "Begin a new raid", "primaryAction", self.start_raid)
-        self.end_raid_button = self._action("□  END RAID", "Complete current raid", "warningAction", self.end_raid)
-        self.abort_raid_button = self._action("△  ABORT RAID", "Cancel current raid record", "dangerAction", self.abort_raid)
+        self.start_raid_button = self._action(
+            "▷  START RAID",
+            "Begin a new raid",
+            "primaryAction",
+            self.start_raid,
+        )
+        self.end_raid_button = self._action(
+            "□  END RAID",
+            "Complete current raid",
+            "warningAction",
+            self.end_raid,
+        )
+        self.abort_raid_button = self._action(
+            "△  ABORT RAID",
+            "Cancel current raid record",
+            "dangerAction",
+            self.abort_raid,
+        )
         controls.addWidget(self.start_raid_button)
         controls.addWidget(self.end_raid_button)
         controls.addWidget(self.abort_raid_button)
@@ -80,13 +185,23 @@ class OperationsCenterPagesMixin:
 
     def _live_page(self) -> QWidget:
         page, layout = self._scroll_page()
-        self._page_heading(layout, "LIVE RAID", "Active raid status, objectives, quick markers, and the event timeline.")
+        self._page_heading(
+            layout,
+            "LIVE RAID",
+            "Active raid status, objectives, quick markers, and the event timeline.",
+        )
         summary = self._panel("RAID OVERVIEW")
         grid = QGridLayout()
         self.live_map = self._summary(grid, 0, 0, "MAP")
         self.live_character = self._summary(grid, 0, 1, "CHARACTER")
         self.live_timer = self._summary(grid, 0, 2, "SESSION", "00:00:00")
-        self.live_objective = self._summary(grid, 1, 0, "PRIMARY OBJECTIVE", span=2)
+        self.live_objective = self._summary(
+            grid,
+            1,
+            0,
+            "PRIMARY OBJECTIVE",
+            span=2,
+        )
         self.live_recording = self._summary(grid, 1, 2, "RECORDING")
         summary.layout().addLayout(grid)
         layout.addWidget(summary)
@@ -104,7 +219,11 @@ class OperationsCenterPagesMixin:
 
     def _markers_page(self) -> QWidget:
         page, layout = self._scroll_page()
-        self._page_heading(layout, "MARKERS", "Record moments from the desktop or Stream Deck and verify every trigger.")
+        self._page_heading(
+            layout,
+            "MARKERS",
+            "Record moments from the desktop or Stream Deck and verify every trigger.",
+        )
         actions = self._panel("MARKER ACTIONS")
         grid = QGridLayout()
         self._marker_buttons_into(grid)
@@ -118,10 +237,18 @@ class OperationsCenterPagesMixin:
 
     def _reviews_page(self) -> QWidget:
         page = QWidget()
+        page.setObjectName("pageRoot")
+        page.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         layout = QVBoxLayout(page)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(12)
         header = QHBoxLayout()
         titles = QVBoxLayout()
-        self._page_heading(titles, "REVIEWS", "Complete raid review, encounter notes, evidence validation, and finalization inside the app.")
+        self._page_heading(
+            titles,
+            "REVIEWS",
+            "Complete raid review, encounter notes, evidence validation, and finalization inside the app.",
+        )
         header.addLayout(titles)
         header.addStretch(1)
         reload_button = QPushButton("RELOAD")
@@ -140,7 +267,9 @@ class OperationsCenterPagesMixin:
         else:
             self.review_web = None
             fallback = self._panel("REVIEW WORKSPACE UNAVAILABLE")
-            message = QLabel("Qt WebEngine is not installed. Use Open in Browser or reinstall the desktop extra.")
+            message = QLabel(
+                "Qt WebEngine is not installed. Use Open in Browser or reinstall the desktop extra."
+            )
             message.setWordWrap(True)
             fallback.layout().addWidget(message)
             layout.addWidget(fallback, 1)
@@ -149,23 +278,43 @@ class OperationsCenterPagesMixin:
     def _feature_page(self, title: str, description: str, path: str | None) -> QWidget:
         page, layout = self._scroll_page()
         self._page_heading(layout, title, description)
-        panel = self._panel("OPERATIONS CENTER MODULE")
-        message = QLabel("The permanent page shell is ready. Its dedicated native workflow will be connected as the intelligence pipeline expands.")
+
+        overview = self._panel("MODULE ROADMAP", "heroPanel")
+        message = QLabel(
+            "This workspace now uses the permanent Operations Center shell. "
+            "The cards below show the native workflows being connected during Phase 6."
+        )
         message.setObjectName("featureBody")
         message.setWordWrap(True)
-        panel.layout().addWidget(message)
+        overview.layout().addWidget(message)
         if path is not None:
-            button = QPushButton("OPEN CURRENT WORKSPACE")
+            button = QPushButton("OPEN LEGACY WORKSPACE")
             button.setObjectName("primaryCompact")
             button.clicked.connect(lambda: self.open_page(path))
-            panel.layout().addWidget(button, 0, Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(panel)
+            overview.layout().addWidget(button, 0, Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(overview)
+
+        cards = QGridLayout()
+        cards.setHorizontalSpacing(12)
+        cards.setVerticalSpacing(12)
+        modules = _FEATURE_MODULES.get(title, ())
+        for index, (name, body, status, state) in enumerate(modules):
+            cards.addWidget(
+                self._feature_card(name, body, status, state),
+                index // 2,
+                index % 2,
+            )
+        layout.addLayout(cards)
         layout.addStretch(1)
         return page
 
     def _settings_page(self) -> QWidget:
         page, layout = self._scroll_page()
-        self._page_heading(layout, "SETTINGS", "Local service controls, API details, and configuration access.")
+        self._page_heading(
+            layout,
+            "SETTINGS",
+            "Local service controls, API details, and configuration access.",
+        )
         panel = self._panel("LOCAL SERVICE")
         row = QHBoxLayout()
         self.settings_service = QLabel("Offline")
@@ -185,7 +334,10 @@ class OperationsCenterPagesMixin:
         form = QFormLayout()
         form.addRow("API address", QLabel(self.client.base_url))
         form.addRow("Configuration", QLabel(str(self.service.config_path)))
-        form.addRow("Polling", QLabel(f"{self.settings.desktop.poll_interval_seconds:g} seconds"))
+        form.addRow(
+            "Polling",
+            QLabel(f"{self.settings.desktop.poll_interval_seconds:g} seconds"),
+        )
         info.layout().addLayout(form)
         layout.addWidget(info)
         layout.addStretch(1)
