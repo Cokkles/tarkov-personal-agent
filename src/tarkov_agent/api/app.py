@@ -12,7 +12,9 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
+from tarkov_agent import __version__
 from tarkov_agent.app_context import AgentContext
+from tarkov_agent.domain.finalization import FinalizationJob
 from tarkov_agent.domain.models import EvidenceKind, Game, MarkerCommand, RaidRecord
 from tarkov_agent.domain.ppe import (
     DimensionDefinition,
@@ -24,6 +26,10 @@ from tarkov_agent.domain.ppe import (
 )
 from tarkov_agent.domain.reviews import RaidReview
 from tarkov_agent.services.control import ControlConflictError, EvidencePathError
+from tarkov_agent.services.finalization import (
+    FinalizationConflictError,
+    FinalizationNotFoundError,
+)
 from tarkov_agent.services.markers import NoActiveRaidError
 from tarkov_agent.services.ppe import PPEDisabledError, PPEValidationError
 from tarkov_agent.services.reviews import ReviewConflictError, ReviewNotFoundError
@@ -112,7 +118,7 @@ def create_app(context: AgentContext, *, start_runtime: bool = True) -> FastAPI:
 
     app = FastAPI(
         title="Tarkov Personal Agent",
-        version="0.3.0",
+        version=__version__,
         lifespan=lifespan,
     )
     app.add_middleware(TokenAuthMiddleware, token=context.settings.api.token)
@@ -127,7 +133,7 @@ def create_app(context: AgentContext, *, start_runtime: bool = True) -> FastAPI:
 
     @app.get("/api/health")
     async def health() -> dict[str, object]:
-        return {"ok": True, "version": "0.3.0"}
+        return {"ok": True, "version": __version__}
 
     @app.get("/api/status")
     async def agent_status() -> dict[str, object]:
@@ -142,6 +148,7 @@ def create_app(context: AgentContext, *, start_runtime: bool = True) -> FastAPI:
             "obs_enabled": context.settings.obs.enabled,
             "ppe_enabled": context.settings.ppe.enabled,
             "ppe_profile_version": profile.version if profile is not None else None,
+            "finalization": context.finalization.latest(),
         }
 
     @app.get("/api/raids", response_model=list[RaidRecord])
@@ -264,11 +271,45 @@ def create_app(context: AgentContext, *, start_runtime: bool = True) -> FastAPI:
         except ControlConflictError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-    @app.post("/api/control/raid/end", response_model=RaidRecord)
-    async def end_raid(request: ManualRaidEndRequest) -> RaidRecord:
+    @app.post(
+        "/api/control/raid/end",
+        response_model=FinalizationJob,
+        status_code=status.HTTP_202_ACCEPTED,
+    )
+    async def end_raid(request: ManualRaidEndRequest) -> FinalizationJob:
         try:
-            return context.controls.end_raid(result=request.result)
-        except ControlConflictError as exc:
+            return context.finalization.submit(result=request.result)
+        except FinalizationConflictError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.get("/api/finalization/jobs", response_model=list[FinalizationJob])
+    async def finalization_jobs(
+        limit: int = Query(default=50, ge=1, le=1000),
+    ) -> list[FinalizationJob]:
+        return context.finalization.list(limit=limit)
+
+    @app.get("/api/finalization/jobs/{job_id}", response_model=FinalizationJob)
+    async def finalization_job(job_id: str) -> FinalizationJob:
+        try:
+            return context.finalization.get(job_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid finalization job ID") from exc
+        except FinalizationNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.post(
+        "/api/finalization/jobs/{job_id}/retry",
+        response_model=FinalizationJob,
+        status_code=status.HTTP_202_ACCEPTED,
+    )
+    async def retry_finalization(job_id: str) -> FinalizationJob:
+        try:
+            return context.finalization.retry(job_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid finalization job ID") from exc
+        except FinalizationNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except FinalizationConflictError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     @app.post("/api/control/raid/abort", response_model=RaidRecord)
