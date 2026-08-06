@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from tarkov_agent.config import AppSettings
+from tarkov_agent.domain.finalization import FinalizationStage
 from tarkov_agent.domain.models import (
     EvidenceKind,
     MarkerCommand,
@@ -26,6 +28,9 @@ class ControlConflictError(RuntimeError):
 
 class EvidencePathError(ValueError):
     pass
+
+
+FinalizationProgressCallback = Callable[[FinalizationStage, int, str], None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,7 +85,12 @@ class ManualControlService:
             raise ControlConflictError("Raid start did not create an active record")
         return raid
 
-    def end_raid(self, *, result: str | None = None) -> RaidRecord:
+    def end_raid(
+        self,
+        *,
+        result: str | None = None,
+        progress_callback: FinalizationProgressCallback | None = None,
+    ) -> RaidRecord:
         active = self._coordinator.active_raid
         if active is None:
             raise ControlConflictError("No active raid to end")
@@ -93,6 +103,7 @@ class ManualControlService:
             RaidSignal.RAID_ENDED,
             reason="Manual raid end",
             payload={"result": result},
+            progress_callback=progress_callback,
         )
         raid = self._repository.get_raid(raid_id)
         if raid is None:
