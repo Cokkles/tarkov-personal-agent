@@ -54,6 +54,35 @@ class DesktopApiClient:
         payload = self._request("GET", "/api/desktop/status")
         return DesktopStatus.model_validate(payload)
 
+    def list_raids(self, *, limit: int = 30) -> list[RaidRecord]:
+        payload = self._request("GET", f"/api/raids?limit={limit}")
+        if not isinstance(payload, list):
+            raise DesktopApiError("Raid list API returned an unexpected response")
+        return [RaidRecord.model_validate(item) for item in payload]
+
+    def review_queue(self, *, limit: int = 30) -> list[RaidRecord]:
+        payload = self._request("GET", f"/api/review-queue?limit={limit}")
+        if not isinstance(payload, list):
+            raise DesktopApiError("Review queue API returned an unexpected response")
+        return [RaidRecord.model_validate(item) for item in payload]
+
+    def timeline(self, raid_id: str) -> list[dict[str, Any]]:
+        payload = self._request("GET", f"/api/raids/{raid_id}/timeline")
+        if not isinstance(payload, list):
+            raise DesktopApiError("Timeline API returned an unexpected response")
+        rows: list[dict[str, Any]] = []
+        for item in payload:
+            if not isinstance(item, Mapping):
+                continue
+            rows.append({str(key): value for key, value in item.items()})
+        return rows
+
+    def raid_bundle(self, raid_id: str) -> dict[str, Any]:
+        payload = self._request("GET", f"/api/raids/{raid_id}")
+        if not isinstance(payload, Mapping):
+            raise DesktopApiError("Raid detail API returned an unexpected response")
+        return {str(key): value for key, value in payload.items()}
+
     def start_raid(
         self,
         *,
