@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QProgressBar,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -55,8 +56,8 @@ _FEATURE_MODULES: dict[str, tuple[tuple[str, str, str, str], ...]] = {
         (
             "ANALYSIS QUEUE",
             "Processing progress, failures, retry controls, and evidence package history.",
-            "PLANNED",
-            "planned",
+            "IN PROGRESS",
+            "next",
         ),
     ),
     "TASKS & OBJECTIVES": (
@@ -150,6 +151,48 @@ class OperationsCenterPagesMixin:
         controls.addWidget(self.end_raid_button)
         controls.addWidget(self.abort_raid_button)
         layout.addLayout(controls)
+
+        pipeline = self._panel("RAID FINALIZATION", "pipelinePanel")
+        pipeline_header = QHBoxLayout()
+        self.finalization_status = QLabel("READY")
+        self.finalization_status.setObjectName("pipelineStatus")
+        self.finalization_status.setProperty("state", "idle")
+        pipeline_header.addWidget(self.finalization_status)
+        pipeline_header.addStretch(1)
+        self.finalization_retry = QPushButton("RETRY FINALIZATION")
+        self.finalization_retry.setObjectName("warningCompact")
+        self.finalization_retry.clicked.connect(self.retry_finalization)
+        self.finalization_retry.setVisible(False)
+        pipeline_header.addWidget(self.finalization_retry)
+        pipeline.layout().addLayout(pipeline_header)
+        self.finalization_message = QLabel(
+            "End Raid returns immediately. OBS and media work continue safely in the background."
+        )
+        self.finalization_message.setObjectName("pipelineMessage")
+        self.finalization_message.setWordWrap(True)
+        pipeline.layout().addWidget(self.finalization_message)
+        self.finalization_progress = QProgressBar()
+        self.finalization_progress.setObjectName("finalizationProgress")
+        self.finalization_progress.setRange(0, 100)
+        self.finalization_progress.setValue(0)
+        self.finalization_progress.setTextVisible(False)
+        pipeline.layout().addWidget(self.finalization_progress)
+        steps = QHBoxLayout()
+        self.finalization_steps: dict[str, QLabel] = {}
+        for key, label in (
+            ("raid_ended", "01  RAID ENDED"),
+            ("stopping_recording", "02  RECORDING"),
+            ("indexing_media", "03  MEDIA INDEX"),
+            ("ready", "04  REVIEW READY"),
+        ):
+            step = QLabel(label)
+            step.setObjectName("pipelineStep")
+            step.setProperty("state", "idle")
+            step.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            steps.addWidget(step, 1)
+            self.finalization_steps[key] = step
+        pipeline.layout().addLayout(steps)
+        layout.addWidget(pipeline)
 
         lower = QHBoxLayout()
         markers = self._panel("LIVE MARKERS")
