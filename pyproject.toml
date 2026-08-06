@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tarkov-personal-agent"
-version = "0.6.0"
+version = "0.7.0"
 description = "Local-first passive raid companion and personal playstyle analytics platform"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -41,7 +41,10 @@ desktop-build = [
 
 [project.scripts]
 tarkov-agent = "tarkov_agent.cli:main"
+
+[project.gui-scripts]
 tarkov-agent-desktop = "tarkov_agent.desktop.app:main"
+tarkov-marker = "tarkov_agent.marker_app:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tarkov_agent"]
