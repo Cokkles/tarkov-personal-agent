@@ -17,10 +17,12 @@ class FinalizationStage(StrEnum):
     FAILED = "failed"
 
 
-TERMINAL_FINALIZATION_STAGES = {
-    FinalizationStage.READY,
-    FinalizationStage.FAILED,
-}
+TERMINAL_FINALIZATION_STAGES: frozenset[FinalizationStage] = frozenset(
+    {
+        FinalizationStage.READY,
+        FinalizationStage.FAILED,
+    }
+)
 
 
 class FinalizationJob(BaseModel):
