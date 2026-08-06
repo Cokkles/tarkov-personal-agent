@@ -11,6 +11,7 @@ from tarkov_agent.observers.process import ProcessObserver
 from tarkov_agent.runtime import CompanionRuntime
 from tarkov_agent.services.control import ManualControlService
 from tarkov_agent.services.coordinator import RaidCoordinator
+from tarkov_agent.services.finalization import RaidFinalizationService
 from tarkov_agent.services.markers import MarkerService
 from tarkov_agent.services.media import MediaService
 from tarkov_agent.services.packages import RaidPackageBuilder
@@ -39,21 +40,22 @@ class AgentContext:
     recommendations: RecommendationService
     recovery: RecoveryService
     controls: ManualControlService
+    finalization: RaidFinalizationService
 
     def recover_interrupted_session(self) -> None:
-        if not self.settings.runtime.recover_interrupted_sessions:
-            return
-        snapshot = ProcessObserver(
-            self.settings.process.executable_names,
-            self.settings.process.poll_interval_seconds,
-        ).snapshot()
-        recovered = self.recovery.recover(game_running=snapshot.running)
-        if (
-            recovered is not None
-            and recovered.state.value == "in_raid"
-            and snapshot.running
-        ):
-            self.coordinator.restore_active_raid(recovered)
+        if self.settings.runtime.recover_interrupted_sessions:
+            snapshot = ProcessObserver(
+                self.settings.process.executable_names,
+                self.settings.process.poll_interval_seconds,
+            ).snapshot()
+            recovered = self.recovery.recover(game_running=snapshot.running)
+            if (
+                recovered is not None
+                and recovered.state.value == "in_raid"
+                and snapshot.running
+            ):
+                self.coordinator.restore_active_raid(recovered)
+        self.finalization.recover_interrupted()
 
 
 def build_context(settings: AppSettings) -> AgentContext:
@@ -106,6 +108,11 @@ def build_context(settings: AppSettings) -> AgentContext:
         repository,
         packages,
     )
+    finalization = RaidFinalizationService(
+        controls,
+        coordinator,
+        settings.paths.desktop_root,
+    )
     return AgentContext(
         settings=settings,
         repository=repository,
@@ -121,4 +128,5 @@ def build_context(settings: AppSettings) -> AgentContext:
         recommendations=recommendations,
         recovery=recovery,
         controls=controls,
+        finalization=finalization,
     )
