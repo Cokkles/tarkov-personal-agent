@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tarkov Personal Agent</title>
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <main>
+    <h1>Tarkov Personal Agent</h1>
+
+    <section>
+      <label for="baseUrl">Agent URL</label>
+      <input id="baseUrl" type="url" value="http://127.0.0.1:8765" spellcheck="false">
+
+      <label for="token">API token</label>
+      <input id="token" type="password" autocomplete="off" placeholder="Optional">
+
+      <button id="testConnection" type="button">Test connection</button>
+      <p id="connectionResult" class="status" aria-live="polite"></p>
+    </section>
+
+    <section id="startRaidFields" hidden>
+      <h2>Start Raid Defaults</h2>
+      <label for="mapName">Map</label>
+      <input id="mapName" type="text" placeholder="Woods">
+
+      <label for="characterType">Character</label>
+      <select id="characterType">
+        <option value="Scav">Scav</option>
+        <option value="PMC">PMC</option>
+      </select>
+
+      <label for="primaryObjective">Primary objective</label>
+      <input id="primaryObjective" type="text" placeholder="Loot">
+
+      <label for="secondaryObjective">Secondary objective</label>
+      <input id="secondaryObjective" type="text" placeholder="Optional">
+    </section>
+
+    <section id="endRaidFields" hidden>
+      <h2>End Raid Defaults</h2>
+      <label for="result">Result</label>
+      <select id="result">
+        <option value="">Ask in review / unspecified</option>
+        <option value="Survived">Survived</option>
+        <option value="KIA">KIA</option>
+        <option value="Run Through">Run Through</option>
+        <option value="Missing in Action">Missing in Action</option>
+      </select>
+    </section>
+
+    <p class="hint">Settings are stored locally by Stream Deck. The plugin only connects to the configured local agent.</p>
+  </main>
+  <script src="settings.js"></script>
+</body>
+</html>

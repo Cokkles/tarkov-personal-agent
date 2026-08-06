@@ -1,0 +1,197 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "UUID": "com.cokkles.tarkov-personal-agent",
+  "Name": "Tarkov Personal Agent",
+  "Version": "0.7.0.0",
+  "Author": "Cokkles",
+  "Description": "Native raid lifecycle, marker, and agent-status controls for Tarkov Personal Agent.",
+  "Category": "Tarkov Personal Agent",
+  "CategoryIcon": "static/imgs/plugin/category",
+  "Icon": "static/imgs/plugin/icon",
+  "CodePath": "bin/plugin.js",
+  "Nodejs": {
+    "Version": "20"
+  },
+  "SDKVersion": 2,
+  "Software": {
+    "MinimumVersion": "6.6"
+  },
+  "OS": [
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "Actions": [
+    {
+      "UUID": "com.cokkles.tarkov-personal-agent.status",
+      "Name": "Agent Status",
+      "Tooltip": "Show whether the local agent and a raid are active.",
+      "Icon": "static/imgs/actions/key",
+      "Controllers": ["Keypad"],
+      "PropertyInspectorPath": "ui/settings.html",
+      "UserTitleEnabled": false,
+      "States": [
+        {
+          "Image": "static/imgs/actions/key",
+          "Title": "AGENT\nSTATUS",
+          "TitleAlignment": "middle",
+          "FontSize": 10
+        }
+      ]
+    },
+    {
+      "UUID": "com.cokkles.tarkov-personal-agent.start-raid",
+      "Name": "Start Raid",
+      "Tooltip": "Start a raid using the configured map, character, and objective.",
+      "Icon": "static/imgs/actions/key",
+      "Controllers": ["Keypad"],
+      "PropertyInspectorPath": "ui/settings.html",
+      "UserTitleEnabled": false,
+      "States": [
+        {
+          "Image": "static/imgs/actions/key",
+          "Title": "START\nRAID",
+          "TitleAlignment": "middle",
+          "FontSize": 10
+        }
+      ]
+    },
+    {
+      "UUID": "com.cokkles.tarkov-personal-agent.end-raid",
+      "Name": "End Raid",
+      "Tooltip": "End the active raid and queue its review.",
+      "Icon": "static/imgs/actions/key",
+      "Controllers": ["Keypad"],
+      "PropertyInspectorPath": "ui/settings.html",
+      "UserTitleEnabled": false,
+      "States": [
+        {
+          "Image": "static/imgs/actions/key",
+          "Title": "END\nRAID",
+          "TitleAlignment": "middle",
+          "FontSize": 10
+        }
+      ]
+    },
+    {
+      "UUID": "com.cokkles.tarkov-personal-agent.pmc-heard",
+      "Name": "PMC Heard",
+      "Tooltip": "Create a possible-PMC audio marker.",
+      "Icon": "static/imgs/actions/key",
+      "Controllers": ["Keypad"],
+      "PropertyInspectorPath": "ui/settings.html",
+      "UserTitleEnabled": false,
+      "States": [
+        {
+          "Image": "static/imgs/actions/key",
+          "Title": "PMC\nHEARD",
+          "TitleAlignment": "middle",
+          "FontSize": 10
+        }
+      ]
+    },
+    {
+      "UUID": "com.cokkles.tarkov-personal-agent.player-seen",
+      "Name": "Player Seen",
+      "Tooltip": "Create a visual player-contact marker.",
+      "Icon": "static/imgs/actions/key",
+      "Controllers": ["Keypad"],
+      "PropertyInspectorPath": "ui/settings.html",
+      "UserTitleEnabled": false,
+      "States": [
+        {
+          "Image": "static/imgs/actions/key",
+          "Title": "PLAYER\nSEEN",
+          "TitleAlignment": "middle",
+          "FontSize": 10
+        }
+      ]
+    },
+    {
+      "UUID": "com.cokkles.tarkov-personal-agent.fight-started",
+      "Name": "Fight Started",
+      "Tooltip": "Create a committed-engagement marker.",
+      "Icon": "static/imgs/actions/key",
+      "Controllers": ["Keypad"],
+      "PropertyInspectorPath": "ui/settings.html",
+      "UserTitleEnabled": false,
+      "States": [
+        {
+          "Image": "static/imgs/actions/key",
+          "Title": "FIGHT\nSTART",
+          "TitleAlignment": "middle",
+          "FontSize": 10
+        }
+      ]
+    },
+    {
+      "UUID": "com.cokkles.tarkov-personal-agent.route-changed",
+      "Name": "Route Changed",
+      "Tooltip": "Create a meaningful route-change marker.",
+      "Icon": "static/imgs/actions/key",
+      "Controllers": ["Keypad"],
+      "PropertyInspectorPath": "ui/settings.html",
+      "UserTitleEnabled": false,
+      "States": [
+        {
+          "Image": "static/imgs/actions/key",
+          "Title": "ROUTE\nCHANGE",
+          "TitleAlignment": "middle",
+          "FontSize": 10
+        }
+      ]
+    },
+    {
+      "UUID": "com.cokkles.tarkov-personal-agent.important-loot",
+      "Name": "Important Loot",
+      "Tooltip": "Create an important-loot marker.",
+      "Icon": "static/imgs/actions/key",
+      "Controllers": ["Keypad"],
+      "PropertyInspectorPath": "ui/settings.html",
+      "UserTitleEnabled": false,
+      "States": [
+        {
+          "Image": "static/imgs/actions/key",
+          "Title": "IMPORTANT\nLOOT",
+          "TitleAlignment": "middle",
+          "FontSize": 9
+        }
+      ]
+    },
+    {
+      "UUID": "com.cokkles.tarkov-personal-agent.mistake",
+      "Name": "Mistake",
+      "Tooltip": "Create an immediate mistake marker.",
+      "Icon": "static/imgs/actions/key",
+      "Controllers": ["Keypad"],
+      "PropertyInspectorPath": "ui/settings.html",
+      "UserTitleEnabled": false,
+      "States": [
+        {
+          "Image": "static/imgs/actions/key",
+          "Title": "MISTAKE",
+          "TitleAlignment": "middle",
+          "FontSize": 10
+        }
+      ]
+    },
+    {
+      "UUID": "com.cokkles.tarkov-personal-agent.good-decision",
+      "Name": "Good Decision",
+      "Tooltip": "Create an immediate positive-decision marker.",
+      "Icon": "static/imgs/actions/key",
+      "Controllers": ["Keypad"],
+      "PropertyInspectorPath": "ui/settings.html",
+      "UserTitleEnabled": false,
+      "States": [
+        {
+          "Image": "static/imgs/actions/key",
+          "Title": "GOOD\nDECISION",
+          "TitleAlignment": "middle",
+          "FontSize": 9
+        }
+      ]
+    }
+  ]
+}
