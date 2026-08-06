@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -37,8 +38,24 @@ def test_manual_raid_review_flow(tmp_path: Path) -> None:
         assert marker.status_code == 200
 
         ended = client.post("/api/control/raid/end", json={"result": "Survived"})
-        assert ended.status_code == 200
-        assert ended.json()["state"] == "review_pending"
+        assert ended.status_code == 202
+        job_id = ended.json()["id"]
+        assert ended.json()["raid_id"] == raid_id
+
+        deadline = time.monotonic() + 3.0
+        finalization = ended.json()
+        while finalization["stage"] not in {"ready", "failed"}:
+            assert time.monotonic() < deadline
+            time.sleep(0.02)
+            response = client.get(f"/api/finalization/jobs/{job_id}")
+            assert response.status_code == 200
+            finalization = response.json()
+        assert finalization["stage"] == "ready"
+        assert finalization["progress"] == 100
+
+        raid_response = client.get(f"/api/raids/{raid_id}")
+        assert raid_response.status_code == 200
+        assert raid_response.json()["raid"]["state"] == "review_pending"
 
         review_response = client.get(f"/api/raids/{raid_id}/review")
         assert review_response.status_code == 200
