@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tarkov-personal-agent"
-version = "0.7.0"
+version = "0.8.0"
 description = "Local-first passive raid companion and personal playstyle analytics platform"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -55,6 +55,7 @@ packages = ["src/tarkov_agent"]
 "src/tarkov_agent/api/static/source_truth.html" = "tarkov_agent/api/static/source_truth.html"
 "src/tarkov_agent/api/static/recommendations.html" = "tarkov_agent/api/static/recommendations.html"
 "src/tarkov_agent/api/static/media.html" = "tarkov_agent/api/static/media.html"
+"src/tarkov_agent/desktop/assets/operations_center_background.jpg" = "tarkov_agent/desktop/assets/operations_center_background.jpg"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -69,7 +70,7 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/tarkov_agent/ppe/registry.py" = ["E501"]
-"src/tarkov_agent/desktop/qt_app.py" = ["E501"]
+"src/tarkov_agent/desktop/qt_*.py" = ["E501", "I001"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -81,5 +82,5 @@ module = ["obsws_python", "obsws_python.*", "PySide6", "PySide6.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["tarkov_agent.desktop.qt_app"]
+module = ["tarkov_agent.desktop.qt_app", "tarkov_agent.desktop.qt_common", "tarkov_agent.desktop.qt_runtime", "tarkov_agent.desktop.qt_theme", "tarkov_agent.desktop.qt_pages", "tarkov_agent.desktop.qt_widgets"]
 ignore_errors = true
