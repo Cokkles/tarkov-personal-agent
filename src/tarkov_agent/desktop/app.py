@@ -45,7 +45,7 @@ def _show_native_error(message: str) -> None:
     if sys.platform != "win32":
         return
     with contextlib.suppress(Exception):
-        ctypes.windll.user32.MessageBoxW(  # type: ignore[attr-defined]
+        ctypes.windll.user32.MessageBoxW(
             0,
             message,
             "Tarkov Personal Agent — Startup Error",
