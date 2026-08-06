@@ -5,7 +5,7 @@ from enum import StrEnum
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class Game(StrEnum):
@@ -33,6 +33,35 @@ class EvidenceKind(StrEnum):
     MARKER = "marker"
     USER_NOTE = "user_note"
     EXPORT = "export"
+
+
+class MarkerType(StrEnum):
+    PMC_HEARD = "contact.audio.possible_pmc"
+    PLAYER_SEEN = "contact.visual.player"
+    FIGHT_STARTED = "combat.engagement.started"
+    ROUTE_CHANGED = "decision.route.changed"
+    IMPORTANT_LOOT = "loot.important"
+    MISTAKE = "review.mistake"
+    GOOD_DECISION = "review.good_decision"
+
+
+MARKER_DEFAULTS: dict[MarkerType, tuple[str, str, str]] = {
+    MarkerType.PMC_HEARD: ("PMC Heard", "audio", "Possible PMC audio cue"),
+    MarkerType.PLAYER_SEEN: ("Player Seen", "contact", "Visual player contact"),
+    MarkerType.FIGHT_STARTED: ("Fight Started", "combat", "Committed engagement"),
+    MarkerType.ROUTE_CHANGED: ("Route Changed", "decision", "Meaningful route change"),
+    MarkerType.IMPORTANT_LOOT: (
+        "Important Loot",
+        "loot",
+        "Important loot acquired or observed",
+    ),
+    MarkerType.MISTAKE: ("Mistake", "review", "Immediate mistake recognition"),
+    MarkerType.GOOD_DECISION: (
+        "Good Decision",
+        "review",
+        "Immediate positive decision recognition",
+    ),
+}
 
 
 class EvidenceReference(BaseModel):
@@ -77,6 +106,35 @@ class RaidRecord(BaseModel):
 
 
 class MarkerCommand(BaseModel):
-    label: str = Field(min_length=1, max_length=120)
-    category: str = Field(default="note", min_length=1, max_length=40)
+    """Stable marker contract shared by desktop, CLI, and Stream Deck clients.
+
+    Legacy callers may continue supplying only ``label`` and ``category``. New
+    clients should send ``marker_type`` and allow the canonical defaults below
+    to populate the display text and category.
+    """
+
+    marker_type: MarkerType | None = None
+    label: str = Field(default="", max_length=120)
+    category: str = Field(default="", max_length=40)
     details: str | None = Field(default=None, max_length=1000)
+    source: str = Field(default="user", min_length=1, max_length=80)
+    request_id: str | None = Field(default=None, min_length=1, max_length=120)
+
+    @model_validator(mode="after")
+    def apply_marker_defaults(self) -> MarkerCommand:
+        if self.marker_type is not None:
+            label, category, details = MARKER_DEFAULTS[self.marker_type]
+            if not self.label.strip():
+                self.label = label
+            if not self.category.strip():
+                self.category = category
+            if self.details is None:
+                self.details = details
+        if not self.label.strip():
+            raise ValueError("A marker requires marker_type or label")
+        if not self.category.strip():
+            self.category = "note"
+        self.label = self.label.strip()
+        self.category = self.category.strip()
+        self.source = self.source.strip()
+        return self
