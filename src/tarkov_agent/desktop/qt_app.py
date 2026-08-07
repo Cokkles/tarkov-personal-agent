@@ -67,6 +67,7 @@ class DesktopWindow(
         self._last_ppe: int | None = None
         self._last_rules: int | None = None
         self._last_finalization_token: str | None = None
+        self._last_status_error: str | None = None
         self._build_window()
         self._build_tray()
         self._configure_timers()

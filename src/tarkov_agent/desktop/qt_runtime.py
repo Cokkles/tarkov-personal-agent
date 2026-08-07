@@ -188,8 +188,12 @@ class OperationsCenterRuntimeMixin:
     def _status_received(self, value: object) -> None:
         status = DesktopStatus.model_validate(value)
         previous_raid = self._active_raid_id
+        if self._last_status_error is not None:
+            self._activity("Local agent service connection restored", "success")
+        self._last_status_error = None
         self._status = status
         self._set_online(True)
+        self.service_label.setToolTip("")
         self.version_label.setText(f"v{status.version}")
         lifecycle = status.lifecycle_state.replace("_", " ").upper()
         if self._last_lifecycle not in {None, status.lifecycle_state}:
@@ -292,6 +296,10 @@ class OperationsCenterRuntimeMixin:
     def _status_failed(self, message: str) -> None:
         self._set_online(False)
         self.service_label.setToolTip(message)
+        self.footer_message.setText(f"Connection error: {message}")
+        if message != self._last_status_error:
+            self._activity(f"Service connection failed: {message}", "error")
+        self._last_status_error = message
 
     @Slot(object)
     def _secondary_received(self, value: object) -> None:
