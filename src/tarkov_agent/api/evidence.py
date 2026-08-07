@@ -3,6 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 
 from tarkov_agent.app_context import AgentContext
@@ -27,7 +28,7 @@ def attach_evidence_routes(app: FastAPI, context: AgentContext) -> None:
         request: EvidenceBundleRequest,
     ) -> EvidenceBundleManifest:
         try:
-            return context.evidence.preview(raid_id, request)
+            return await run_in_threadpool(context.evidence.preview, raid_id, request)
         except LookupError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except (EvidenceIntelligenceDisabledError, EvidenceBundleError) as exc:
@@ -42,7 +43,7 @@ def attach_evidence_routes(app: FastAPI, context: AgentContext) -> None:
         request: EvidenceBundleRequest,
     ) -> EvidenceBundleResult:
         try:
-            return context.evidence.build(raid_id, request)
+            return await run_in_threadpool(context.evidence.build, raid_id, request)
         except LookupError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except (EvidenceIntelligenceDisabledError, EvidenceBundleError) as exc:
