@@ -11,6 +11,7 @@ from tarkov_agent.observers.process import ProcessObserver
 from tarkov_agent.runtime import CompanionRuntime
 from tarkov_agent.services.control import ManualControlService
 from tarkov_agent.services.coordinator import RaidCoordinator
+from tarkov_agent.services.evidence import EvidenceIntelligenceService
 from tarkov_agent.services.finalization import RaidFinalizationService
 from tarkov_agent.services.markers import MarkerService
 from tarkov_agent.services.media import MediaService
@@ -32,6 +33,7 @@ class AgentContext:
     recording: RecordingController
     markers: MarkerService
     media: MediaService
+    evidence: EvidenceIntelligenceService
     coordinator: RaidCoordinator
     runtime: CompanionRuntime
     reviews: RaidReviewService
@@ -77,6 +79,7 @@ def build_context(settings: AppSettings) -> AgentContext:
             *settings.api.allowed_evidence_roots,
         ],
     )
+    evidence = EvidenceIntelligenceService(repository, media)
     coordinator = RaidCoordinator(
         settings,
         repository,
@@ -120,6 +123,7 @@ def build_context(settings: AppSettings) -> AgentContext:
         recording=recording,
         markers=markers,
         media=media,
+        evidence=evidence,
         coordinator=coordinator,
         runtime=runtime,
         reviews=reviews,

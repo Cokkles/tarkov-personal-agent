@@ -197,7 +197,7 @@ class DesktopWindow(
         app_version.setObjectName("topbarMuted")
         self.version_label = QLabel("SERVICE v—")
         self.version_label.setObjectName("topbarMuted")
-        phase = QLabel("PHASE 6 · LOCAL INTELLIGENCE")
+        phase = QLabel("PHASE 7 · EVIDENCE INTELLIGENCE")
         phase.setObjectName("phaseBadge")
         refresh = QPushButton("REFRESH")
         refresh.setObjectName("ghostButton")

@@ -15,5 +15,5 @@ def test_phase_6_theme_exports_public_style() -> None:
     assert "qlineargradient" in STYLE
 
 
-def test_phase_6_version() -> None:
-    assert __version__ == "0.10.1"
+def test_phase_7_version() -> None:
+    assert __version__ == "0.11.0"
