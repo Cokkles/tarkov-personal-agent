@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from typing import Any
+from types import TracebackType
+from typing import Any, Protocol, cast
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import ProxyHandler, Request, build_opener
 
+from pydantic import ValidationError
+
+from tarkov_agent import __version__
 from tarkov_agent.config import AppSettings
 from tarkov_agent.domain.desktop import DesktopStatus
 from tarkov_agent.domain.finalization import FinalizationJob
@@ -16,6 +20,28 @@ class DesktopApiError(RuntimeError):
     def __init__(self, message: str, *, status_code: int | None = None) -> None:
         super().__init__(message)
         self.status_code = status_code
+
+
+class _UrlResponse(Protocol):
+    def __enter__(self) -> _UrlResponse: ...
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None: ...
+
+    def read(self) -> bytes: ...
+
+
+# urllib inherits system proxy settings by default. Loopback desktop traffic must
+# never leave the machine or depend on a Windows proxy/PAC configuration.
+_DIRECT_OPENER = build_opener(ProxyHandler({}))
+
+
+def urlopen(request: Request, timeout: float) -> _UrlResponse:
+    return cast(_UrlResponse, _DIRECT_OPENER.open(request, timeout=timeout))
 
 
 def desktop_base_url(settings: AppSettings) -> str:
@@ -52,8 +78,53 @@ class DesktopApiClient:
         return isinstance(payload, Mapping) and payload.get("ok") is True
 
     def status(self) -> DesktopStatus:
-        payload = self._request("GET", "/api/desktop/status")
-        return DesktopStatus.model_validate(payload)
+        try:
+            payload = self._request("GET", "/api/desktop/status")
+            return DesktopStatus.model_validate(payload)
+        except (DesktopApiError, ValidationError) as primary_error:
+            # Older or partially updated local services can still expose the
+            # stable core status contract while the desktop-specific projection
+            # is unavailable. Keep the dashboard usable and report real service
+            # state instead of presenting a healthy process as offline.
+            try:
+                core_payload = self._request("GET", "/api/status")
+                health_payload = self._request("GET", "/api/health")
+                return self._desktop_status_from_core(core_payload, health_payload)
+            except (DesktopApiError, ValidationError) as fallback_error:
+                raise DesktopApiError(
+                    "Desktop status request failed: "
+                    f"{primary_error}. Core status fallback also failed: "
+                    f"{fallback_error}"
+                ) from fallback_error
+
+    def _desktop_status_from_core(
+        self,
+        payload: object,
+        health_payload: object,
+    ) -> DesktopStatus:
+        if not isinstance(payload, Mapping):
+            raise DesktopApiError("Core status API returned an unexpected response")
+        health = health_payload if isinstance(health_payload, Mapping) else {}
+        version = health.get("version")
+        return DesktopStatus.model_validate(
+            {
+                "version": version if isinstance(version, str) else __version__,
+                "lifecycle_state": payload.get("lifecycle_state", "unknown"),
+                "active_raid": payload.get("active_raid"),
+                "review_queue_count": payload.get("review_queue_count", 0),
+                "automatic_log_rules": payload.get("automatic_log_rules", 0),
+                "obs": {"enabled": bool(payload.get("obs_enabled", False))},
+                "ppe_enabled": payload.get(
+                    "ppe_enabled",
+                    self._settings.ppe.enabled,
+                ),
+                "ppe_profile_version": payload.get("ppe_profile_version"),
+                "source_truth_enabled": self._settings.truth.enabled,
+                "recommendations_enabled": self._settings.recommendations.enabled,
+                "media_enabled": self._settings.media.enabled,
+                "finalization": payload.get("finalization"),
+            }
+        )
 
     def list_raids(self, *, limit: int = 30) -> list[RaidRecord]:
         payload = self._request("GET", f"/api/raids?limit={limit}")

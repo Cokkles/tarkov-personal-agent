@@ -3,7 +3,8 @@ from __future__ import annotations
 from io import BytesIO
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import Mock, patch
+from urllib.error import HTTPError
 from urllib.request import Request
 
 from tarkov_agent.config import ApiSettings, AppSettings, PathSettings
@@ -64,6 +65,51 @@ def test_status_request_uses_token_and_parses_model(tmp_path: Path) -> None:
     assert status.lifecycle_state == "idle"
     assert status.finalization is None
     assert captured[0].get_header("X-tpa-token") == "desktop-token"
+
+
+def test_status_falls_back_to_core_contract(tmp_path: Path) -> None:
+    settings = AppSettings(
+        paths=PathSettings(data_root=tmp_path),
+        api=ApiSettings(token="desktop-token"),
+    )
+    client = DesktopApiClient(settings)
+    requested_paths: list[str] = []
+
+    def fake_urlopen(request: Request, timeout: float) -> FakeResponse:
+        requested_paths.append(request.full_url)
+        if request.full_url.endswith("/api/desktop/status"):
+            raise HTTPError(
+                request.full_url,
+                500,
+                "Internal Server Error",
+                {},
+                Mock(read=lambda: b'{"detail":"desktop projection failed"}'),
+            )
+        if request.full_url.endswith("/api/status"):
+            return FakeResponse(
+                b'{"lifecycle_state":"aborted","active_raid":null,'
+                b'"review_queue_count":2,"automatic_log_rules":0,'
+                b'"obs_enabled":true,"ppe_enabled":true,'
+                b'"ppe_profile_version":3,"finalization":null}'
+            )
+        if request.full_url.endswith("/api/health"):
+            return FakeResponse(b'{"ok":true,"version":"0.11.1"}')
+        raise AssertionError(f"Unexpected request: {request.full_url}")
+
+    with patch("tarkov_agent.desktop.client.urlopen", fake_urlopen):
+        status = client.status()
+
+    assert requested_paths == [
+        "http://127.0.0.1:8765/api/desktop/status",
+        "http://127.0.0.1:8765/api/status",
+        "http://127.0.0.1:8765/api/health",
+    ]
+    assert status.version == "0.11.1"
+    assert status.lifecycle_state == "aborted"
+    assert status.review_queue_count == 2
+    assert status.obs.enabled is True
+    assert status.obs.connected is False
+    assert status.ppe_profile_version == 3
 
 
 def test_end_raid_returns_background_finalization_job(tmp_path: Path) -> None:
