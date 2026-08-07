@@ -34,13 +34,34 @@ class EvidenceBundleError(RuntimeError):
 
 
 _MARKER_PRIORITIES: dict[str, tuple[float, str]] = {
-    MarkerType.FIGHT_STARTED.value: (1.00, "Combat engagement has the highest review value"),
-    MarkerType.MISTAKE.value: (0.96, "Player explicitly marked a possible mistake"),
-    MarkerType.PLAYER_SEEN.value: (0.92, "Visual contact can establish detection and positioning context"),
-    MarkerType.GOOD_DECISION.value: (0.88, "Player explicitly marked a decision worth reinforcing"),
-    MarkerType.PMC_HEARD.value: (0.84, "Audio contact can establish awareness before visual contact"),
-    MarkerType.ROUTE_CHANGED.value: (0.68, "Route changes capture tactical or objective decisions"),
-    MarkerType.IMPORTANT_LOOT.value: (0.54, "Important loot can explain route and objective decisions"),
+    MarkerType.FIGHT_STARTED.value: (
+        1.00,
+        "Combat engagement has the highest review value",
+    ),
+    MarkerType.MISTAKE.value: (
+        0.96,
+        "Player explicitly marked a possible mistake",
+    ),
+    MarkerType.PLAYER_SEEN.value: (
+        0.92,
+        "Visual contact can establish detection and positioning context",
+    ),
+    MarkerType.GOOD_DECISION.value: (
+        0.88,
+        "Player explicitly marked a decision worth reinforcing",
+    ),
+    MarkerType.PMC_HEARD.value: (
+        0.84,
+        "Audio contact can establish awareness before visual contact",
+    ),
+    MarkerType.ROUTE_CHANGED.value: (
+        0.68,
+        "Route changes capture tactical or objective decisions",
+    ),
+    MarkerType.IMPORTANT_LOOT.value: (
+        0.54,
+        "Important loot can explain route and objective decisions",
+    ),
 }
 
 _LABEL_TO_MARKER: dict[str, str] = {
@@ -418,7 +439,9 @@ class EvidenceIntelligenceService:
     @staticmethod
     def _require_package(raid: RaidRecord) -> None:
         if not (raid.data_root / "raid.json").is_file():
-            raise EvidenceBundleError("Raid package is unavailable; evidence bundle cannot be built")
+            raise EvidenceBundleError(
+                "Raid package is unavailable; evidence bundle cannot be built"
+            )
 
     def _require_enabled(self) -> None:
         if not self.enabled:
