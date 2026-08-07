@@ -16,4 +16,4 @@ def test_phase_6_theme_exports_public_style() -> None:
 
 
 def test_phase_6_version() -> None:
-    assert __version__ == "0.10.0"
+    assert __version__ == "0.10.1"

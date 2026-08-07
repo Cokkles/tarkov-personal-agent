@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from tarkov_agent import __version__
 from tarkov_agent.config import AppSettings
 from tarkov_agent.desktop.client import DesktopApiClient
 from tarkov_agent.desktop.qt_common import BackgroundWidget, NAVIGATION
@@ -192,7 +193,9 @@ class DesktopWindow(
         self.service_label.setObjectName("serviceText")
         api = QLabel(f"API: {self.client.base_url}")
         api.setObjectName("topbarMuted")
-        self.version_label = QLabel("v—")
+        app_version = QLabel(f"APP v{__version__}")
+        app_version.setObjectName("topbarMuted")
+        self.version_label = QLabel("SERVICE v—")
         self.version_label.setObjectName("topbarMuted")
         phase = QLabel("PHASE 6 · LOCAL INTELLIGENCE")
         phase.setObjectName("phaseBadge")
@@ -203,6 +206,7 @@ class DesktopWindow(
             self.service_dot,
             self.service_label,
             api,
+            app_version,
             self.version_label,
         ):
             layout.addWidget(widget)
