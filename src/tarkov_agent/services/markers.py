@@ -58,13 +58,18 @@ class MarkerService:
                     "A marker cannot be created without an active raid"
                 )
 
-            timestamp = occurred_at or datetime.now(UTC)
+            now = datetime.now(UTC)
+            timestamp = occurred_at or command.occurred_at or now
+            # A client-supplied time may not be in the future (clock skew, bad input).
+            timestamp = min(timestamp, now)
             marker_key = (
                 str(raid.id),
                 command.marker_type.value
                 if command.marker_type is not None
                 else command.label.casefold(),
-                command.source.casefold(),
+                # Include the details so two different callouts of the same type in quick
+                # succession (for example two different loot items) are kept separate.
+                f"{command.source.casefold()}|{(command.details or '').casefold()}",
             )
             recent = self._recent.get(marker_key)
             if recent is not None:
@@ -86,7 +91,7 @@ class MarkerService:
                 event_type="marker",
                 label=command.label,
                 source=command.source,
-                confidence=1.0,
+                confidence=command.confidence,
                 payload={
                     "marker_type": (
                         command.marker_type.value

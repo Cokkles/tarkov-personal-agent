@@ -5,7 +5,7 @@ from enum import StrEnum
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class Game(StrEnum):
@@ -119,6 +119,18 @@ class MarkerCommand(BaseModel):
     details: str | None = Field(default=None, max_length=1000)
     source: str = Field(default="user", min_length=1, max_length=80)
     request_id: str | None = Field(default=None, min_length=1, max_length=120)
+    # Optional. Lets a client that detects an event after the fact (for example voice
+    # transcription) place the marker at the moment the event actually happened.
+    occurred_at: datetime | None = None
+    # Optional. 1.0 for deliberate presses; lower for inferred markers such as speech.
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+
+    @field_validator("occurred_at")
+    @classmethod
+    def occurred_at_is_utc(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
     @model_validator(mode="after")
     def apply_marker_defaults(self) -> MarkerCommand:
