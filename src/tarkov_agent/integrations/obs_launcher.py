@@ -81,7 +81,12 @@ class ObsLauncher:
         kwargs: dict[str, Any] = {"cwd": str(executable.parent)}
         if sys.platform == "win32" or os.name == "nt":
             kwargs["creationflags"] = 0x00000008 | 0x00000200  # DETACHED | NEW_PROCESS_GROUP
-        self._process = self._spawn([str(executable), *cfg.launch_args], **kwargs)
+        args = list(cfg.launch_args)
+        if cfg.profile:
+            args += ["--profile", cfg.profile]
+        if cfg.scene_collection:
+            args += ["--collection", cfg.scene_collection]
+        self._process = self._spawn([str(executable), *args], **kwargs)
         deadline = self._clock() + cfg.launch_wait_seconds
         while self._clock() < deadline:
             if self._port_open(cfg.host, cfg.port):

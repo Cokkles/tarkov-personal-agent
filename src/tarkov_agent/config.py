@@ -92,6 +92,9 @@ class ObsSettings(BaseModel):
     executable: Path | None = None
     launch_args: tuple[str, ...] = ("--minimize-to-tray", "--disable-shutdown-check")
     launch_wait_seconds: float = Field(default=45.0, ge=1.0, le=300.0)
+    # Profile (and optional scene collection) the agent switches OBS to, e.g. "OBS PPE Record".
+    profile: str = ""
+    scene_collection: str = ""
     # Close OBS on exit only if this agent started it.
     close_on_exit: bool = False
 

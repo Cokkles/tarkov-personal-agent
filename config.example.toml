@@ -51,6 +51,9 @@ stop_recording_on_raid_end = true
 # Start OBS hidden in the tray when the agent starts (reuses OBS if already open).
 # Enable the WebSocket server once in OBS: Tools > WebSocket Server Settings.
 auto_launch = false
+# Profile OBS should use (applied at launch and after connecting; never mid-recording).
+profile = "OBS PPE Record"
+# scene_collection = ""
 # executable = "C:/Program Files/obs-studio/bin/64bit/obs64.exe"
 close_on_exit = false
 

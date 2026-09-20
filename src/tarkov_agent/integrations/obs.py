@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 import threading
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 from tarkov_agent.config import ObsSettings
+
+LOGGER = logging.getLogger(__name__)
 
 
 class ObsIntegrationError(RuntimeError):
@@ -64,7 +67,29 @@ class ObsRecordingController:
                 raise ObsIntegrationError(
                     f"Unable to connect to OBS WebSocket: {exc}"
                 ) from exc
+            self._apply_profile()
             return self._client
+
+    def _apply_profile(self) -> None:
+        """Switch to the configured profile/collection; never interrupts a recording."""
+        client: Any = self._client
+        wanted_profile = self._settings.profile
+        wanted_collection = self._settings.scene_collection
+        if client is None or not (wanted_profile or wanted_collection):
+            return
+        try:
+            if client.get_record_status().output_active:
+                return
+            if wanted_collection:
+                current = client.get_scene_collection_list().current_scene_collection_name
+                if current != wanted_collection:
+                    client.set_current_scene_collection(wanted_collection)
+            if wanted_profile:
+                current = client.get_profile_list().current_profile_name
+                if current != wanted_profile:
+                    client.set_current_profile(wanted_profile)
+        except Exception as exc:
+            LOGGER.warning("Could not switch OBS profile to %r: %s", wanted_profile, exc)
 
     @staticmethod
     def _response_bool(response: object, name: str, default: bool = False) -> bool:

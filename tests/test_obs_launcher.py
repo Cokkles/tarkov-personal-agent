@@ -98,3 +98,15 @@ def test_closes_only_when_owned_and_enabled(tmp_path: Path) -> None:
     launcher2 = _launcher(keep_settings, [False, True], [], kept)
     launcher2.ensure_running()
     assert launcher2.close_if_owned() is False and not kept.terminated
+
+
+def test_launch_passes_profile_and_collection(tmp_path: Path) -> None:
+    calls: list = []
+    settings = ObsSettings(
+        enabled=True, auto_launch=True, executable=_exe(tmp_path),
+        profile="OBS PPE Record", scene_collection="PPE",
+    )
+    _launcher(settings, [False, True], calls, FakeProcess()).ensure_running()
+    cmd = calls[0][0]
+    assert cmd[cmd.index("--profile") + 1] == "OBS PPE Record"
+    assert cmd[cmd.index("--collection") + 1] == "PPE"
