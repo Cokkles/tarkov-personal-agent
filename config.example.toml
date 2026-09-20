@@ -18,8 +18,9 @@ poll_interval_seconds = 1.0
 start_at_end = true
 minimum_auto_signal_confidence = 0.90
 
-# Verified against 106 real EFT session logs (client 1.0.5 to 1.1.5). Patterns anchor on
-# "|Info|application|" so the duplicate copy of each line in output_000.log is ignored.
+# Verified against real EFT session logs (client 1.0.5 to 1.1.5). Patterns anchor on
+# "|application|" directly after the level so the duplicate copy of each line in
+# output_000.log ("|Info|output|application|") is ignored. GC lines are Debug level.
 # Raid end is the "GC mode switched to Enabled" that follows GameStarted; the state machine
 # ignores that line whenever no raid is active.
 [[logs.rules]]
@@ -36,7 +37,7 @@ confidence = 0.97
 
 [[logs.rules]]
 name = "eft-raid-exit"
-pattern = '\|Info\|application\|GC mode switched to Enabled'
+pattern = '\|(?:Info|Debug)\|application\|GC mode switched to Enabled'
 signal = "raid_ended"
 confidence = 0.92
 

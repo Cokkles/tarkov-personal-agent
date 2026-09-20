@@ -33,12 +33,16 @@ def test_game_started_is_raid_start() -> None:
 
 
 def test_gc_enabled_is_raid_end() -> None:
+    # The application log writes this line at Debug level, not Info.
+    debug = APP.replace("|Info|", "|Debug|")
+    assert _signals(debug + "GC mode switched to Enabled") == ["raid_ended"]
     assert _signals(APP + "GC mode switched to Enabled") == ["raid_ended"]
 
 
 def test_output_log_duplicates_are_ignored() -> None:
     assert _signals(OUT + "GameStarted:99.96(0) real:116.12(0) diff:16.16") == []
     assert _signals(OUT + "GC mode switched to Enabled") == []
+    assert _signals(OUT.replace("|Info|", "|Debug|") + "GC mode switched to Enabled") == []
 
 
 def test_unrelated_lines_do_nothing() -> None:
