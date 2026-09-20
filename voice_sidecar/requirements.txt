@@ -1,0 +1,7 @@
+faster-whisper>=1.0.3
+sounddevice>=0.4.7
+webrtcvad-wheels>=2.0.14
+numpy>=1.26
+# CUDA libraries for GPU transcription on Windows (skip if you only use the CPU fallback)
+nvidia-cublas-cu12
+nvidia-cudnn-cu12==9.*
