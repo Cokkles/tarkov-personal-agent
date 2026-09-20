@@ -87,6 +87,13 @@ class ObsSettings(BaseModel):
     timeout_seconds: float = Field(default=3.0, gt=0.1, le=60.0)
     start_recording_on_raid_start: bool = True
     stop_recording_on_raid_end: bool = True
+    # Start OBS hidden in the tray when the agent starts and it is not already running.
+    auto_launch: bool = False
+    executable: Path | None = None
+    launch_args: tuple[str, ...] = ("--minimize-to-tray", "--disable-shutdown-check")
+    launch_wait_seconds: float = Field(default=45.0, ge=1.0, le=300.0)
+    # Close OBS on exit only if this agent started it.
+    close_on_exit: bool = False
 
 
 class ApiSettings(BaseModel):

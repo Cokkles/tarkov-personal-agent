@@ -5,6 +5,7 @@ import logging
 
 from tarkov_agent.config import AppSettings
 from tarkov_agent.domain.state_machine import InvalidTransition
+from tarkov_agent.integrations.obs_launcher import ObsLauncher
 from tarkov_agent.observers.logs import LogSignalClassifier, LogTailObserver
 from tarkov_agent.observers.process import ProcessObserver
 from tarkov_agent.services.coordinator import RaidCoordinator
@@ -30,6 +31,7 @@ class CompanionRuntime:
             poll_interval_seconds=settings.logs.poll_interval_seconds,
         )
         self._classifier = LogSignalClassifier(settings.logs.rules)
+        self._obs_launcher = ObsLauncher(settings.obs)
 
     def request_stop(self) -> None:
         self._stop_event.set()
@@ -39,6 +41,8 @@ class CompanionRuntime:
             asyncio.create_task(self._watch_process(), name="process-observer"),
             asyncio.create_task(self._watch_logs(), name="log-observer"),
         ]
+        if self._settings.obs.enabled and self._settings.obs.auto_launch:
+            tasks.append(asyncio.create_task(self._launch_obs(), name="obs-launcher"))
         stop_task = asyncio.create_task(self._stop_event.wait(), name="shutdown-waiter")
         try:
             await stop_task
@@ -46,6 +50,14 @@ class CompanionRuntime:
             for task in tasks:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
+            await asyncio.to_thread(self._obs_launcher.close_if_owned)
+
+    async def _launch_obs(self) -> None:
+        try:
+            outcome = await asyncio.to_thread(self._obs_launcher.ensure_running)
+            LOGGER.info("OBS launcher: %s", outcome)
+        except Exception:
+            LOGGER.exception("OBS launcher failed; recording needs OBS started manually")
 
     async def _watch_process(self) -> None:
         async for snapshot in self._process_observer.changes():

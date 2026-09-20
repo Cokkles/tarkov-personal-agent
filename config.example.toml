@@ -18,12 +18,27 @@ poll_interval_seconds = 1.0
 start_at_end = true
 minimum_auto_signal_confidence = 0.90
 
-# Rules remain empty until current Tarkov logs are collected and validated.
-# [[logs.rules]]
-# name = "verified-raid-start"
-# pattern = "REPLACE_WITH_VERIFIED_REGEX"
-# signal = "raid_started"
-# confidence = 0.99
+# Verified against 106 real EFT session logs (client 1.0.5 to 1.1.5). Patterns anchor on
+# "|Info|application|" so the duplicate copy of each line in output_000.log is ignored.
+# Raid end is the "GC mode switched to Enabled" that follows GameStarted; the state machine
+# ignores that line whenever no raid is active.
+[[logs.rules]]
+name = "eft-matching-completed"
+pattern = '\|Info\|application\|MatchingCompleted:'
+signal = "raid_candidate_found"
+confidence = 0.92
+
+[[logs.rules]]
+name = "eft-game-started"
+pattern = '\|Info\|application\|GameStarted:'
+signal = "raid_started"
+confidence = 0.97
+
+[[logs.rules]]
+name = "eft-raid-exit"
+pattern = '\|Info\|application\|GC mode switched to Enabled'
+signal = "raid_ended"
+confidence = 0.92
 
 [obs]
 enabled = false
@@ -33,6 +48,11 @@ password = ""
 timeout_seconds = 3.0
 start_recording_on_raid_start = true
 stop_recording_on_raid_end = true
+# Start OBS hidden in the tray when the agent starts (reuses OBS if already open).
+# Enable the WebSocket server once in OBS: Tools > WebSocket Server Settings.
+auto_launch = false
+# executable = "C:/Program Files/obs-studio/bin/64bit/obs64.exe"
+close_on_exit = false
 
 [api]
 enabled = true
