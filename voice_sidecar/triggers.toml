@@ -1,0 +1,142 @@
+# Trigger rules for the voice sidecar.
+#
+# Text is lower-cased, punctuation and apostrophes are removed ("there's" -> "theres"),
+# and spoken letters are collapsed ("p m c" -> "pmc"), so write patterns against that form.
+#
+# Each rule maps to one of the agent's stable marker types.
+#   confidence         natural speech ("i hear something to my left")
+#   prefix_confidence  when you say a prefix word first ("mark mistake", "mark heard left")
+#   cooldown_s         ignore the same marker again for this many seconds
+#   patterns           regexes for natural speech
+#   prefix_aliases     short regexes that only count after a prefix word
+
+[settings]
+# Words that lower confidence when they show up in the same sentence: you are probably
+# talking to chat or telling a story rather than calling out something happening now.
+negative_context = [
+  "chat", "guys", "viewers", "someone said", "they said", "last raid", "last time",
+  "yesterday", "earlier", "usually", "always", "sometimes", "if you", "when you",
+  "you can", "you should", "for example", "remember when", "in the video",
+]
+negative_multiplier = 0.5
+# Filler removed from the start of a sentence before checking for a prefix word.
+prefix_fillers = ["okay", "ok", "um", "uh", "so", "alright", "right", "and", "hey"]
+# Loot terms that make a "found ___" callout more certain.
+important_loot = [
+  "keycard", "key", "gpu", "graphics card", "ledx", "bitcoin", "sas drive", "intel",
+  "docs case", "documents case", "weapons case", "item case", "thicc", "lab", "red",
+  "moonshine", "tetriz", "vpx", "cpu fan", "rtx", "dogtag", "dog tag", "morphine",
+]
+important_loot_boost = 0.15
+# Words that mean a "found ..." phrase is not about loot.
+loot_item_stoplist = [
+  "out", "that", "it", "myself", "him", "them", "you", "this", "the", "my", "your",
+  "a lot", "some", "one", "two", "no", "nothing", "something", "another", "any",
+]
+# Words that show a "found ___" phrase is about something other than loot.
+loot_reject_words = [
+  "guy", "guys", "pmc", "scav", "player", "kill", "killed", "shot", "hit", "eyes", "visual",
+  "hurt", "feeling", "idea", "problem", "message", "chat", "subscriber", "follower", "sub",
+  "donation", "bits", "raid", "extract", "spawn", "death", "killa", "dead", "bug", "overlay",
+  "stream", "setting", "settings", "mod", "game", "update", "patch", "error", "issue",
+  "answer", "solution", "way", "time", "reason",
+]
+
+[[rule]]
+name = "pmc_heard"
+marker_type = "contact.audio.possible_pmc"
+confidence = 0.75
+prefix_confidence = 0.95
+cooldown_s = 8
+patterns = [
+  '\bi (?:just )?(?:hear|heard) (?:something|someone|somebody|footsteps|steps|movement|shots?|shooting|gunfire|talking|voices?|a (?:pmc|guy|player|scav|dude|door|sniper))',
+  '\b(?:im hearing|hearing) (?:something|someone|footsteps|steps|movement|shots?|voices?)',
+  '\b(?:footsteps|steps|movement|someone|somebody|a guy|a pmc) (?:to|on|from|behind|in|at) (?:my|the) (?:left|right|front|back|rear|behind)',
+  '\btheres (?:someone|somebody|a guy|a pmc|a player) (?:to|on|behind|in) (?:my|the)',
+  '\bsomeone(?:s| is) (?:running|walking|sprinting|moving|creeping)\b',
+]
+prefix_aliases = ['^(?:heard|hear|audio|footsteps|noise)\b']
+
+[[rule]]
+name = "player_seen"
+marker_type = "contact.visual.player"
+confidence = 0.8
+prefix_confidence = 0.95
+cooldown_s = 8
+patterns = [
+  '\b(?:i )?(?:just )?(?:spotted|see|saw|have eyes on|got eyes on|eyes on|got a visual on|visual on) (?:a |an |the |one |two |another )?(?:guy|pmc|player|scav|enemy|dude|person|sniper|raider|boss|cultist|movement|him|them|someone|somebody)',
+  '\btheres (?:a |an )?(?:guy|pmc|player|dude|enemy|someone|somebody|scav|sniper)\b',
+  '\b(?:contact|enemy|tango) (?:spotted|ahead|front|left|right|visual)\b',
+  '\bspotted (?:a |one |him|them)\b',
+]
+prefix_aliases = ['^(?:seen|spotted|contact|visual|player|saw)\b']
+
+[[rule]]
+name = "fight_started"
+marker_type = "combat.engagement.started"
+confidence = 0.75
+prefix_confidence = 0.95
+cooldown_s = 10
+patterns = [
+  '\b(?:im |were |we are |i am )?(?:engaging|taking fire|getting shot at|being shot at|in a fight|in a firefight)\b',
+  '\bfight(?:s)? (?:is )?(?:on|started|starting)\b',
+  '\bshots fired\b',
+  '\bim (?:pushing|peeking|rushing|going in|committing)\b',
+  '\b(?:he|they) (?:shot|are shooting|is shooting) (?:at )?me\b',
+]
+prefix_aliases = ['^(?:fight|engage|engaging|combat|shooting|contact front)\b']
+
+[[rule]]
+name = "route_changed"
+marker_type = "decision.route.changed"
+confidence = 0.7
+prefix_confidence = 0.95
+cooldown_s = 10
+patterns = [
+  '\b(?:changing|switching|rerouting|re routing) (?:my |the )?(?:route|plan|path|direction)',
+  '\b(?:new plan|change of plans?|changing plans?|switching plans?)\b',
+  '\b(?:rotating|rotate) (?:to|towards|around|out)\b',
+  '\b(?:going|taking) (?:a )?different (?:way|route|path)\b',
+  '\b(?:avoiding|backtracking|backing off|backing out)\b',
+]
+prefix_aliases = ['^(?:route|reroute|rotate|rotating|new plan)\b']
+
+[[rule]]
+name = "important_loot"
+marker_type = "loot.important"
+confidence = 0.65
+prefix_confidence = 0.95
+cooldown_s = 4
+# Patterns with an (?P<item>...) group also record what was found.
+patterns = [
+  '\b(?:found|got|grabbed|picked up|looted|scored|pulled) (?:a |an |the |some |my |another )?(?P<item>(?:[a-z0-9\-]+ ?){1,4})',
+  '\btheres (?:a |an )?(?P<item>(?:[a-z0-9\-]+ ?){1,4}) on the (?:floor|ground|table|shelf|desk|body)',
+  '\bjackpot\b',
+]
+prefix_aliases = ['^(?:loot|found|got)\b ?(?P<item>(?:[a-z0-9\-]+ ?){0,4})']
+
+[[rule]]
+name = "mistake"
+marker_type = "review.mistake"
+confidence = 0.7
+prefix_confidence = 0.98
+cooldown_s = 6
+patterns = [
+  '\b(?:thats |that was |that is |what )?(?:a )?(?:mistake|misplay|bad move|bad decision|bad call|bad idea)\b',
+  '\b(?:my bad|my fault|i messed up|i screwed up|i blew it|i should not have|i shouldnt have|i should have)\b',
+  '\bwhy did i\b',
+]
+prefix_aliases = ['^(?:mistake|bad|my bad|messed up)\b']
+
+[[rule]]
+name = "good_decision"
+marker_type = "review.good_decision"
+confidence = 0.7
+prefix_confidence = 0.98
+cooldown_s = 6
+patterns = [
+  '\b(?:good|nice|great|smart) (?:call|move|decision|play|positioning|read)\b',
+  '\bnailed it\b',
+  '\bthats how you do it\b',
+]
+prefix_aliases = ['^(?:good|nice|good call|good decision|well done)\b']

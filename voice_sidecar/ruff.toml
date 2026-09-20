@@ -1,0 +1,5 @@
+# Inherit the agent's lint rules; the sidecar is a separate top-level package.
+extend = "../pyproject.toml"
+
+[lint.isort]
+known-first-party = ["tarkov_voice"]

@@ -1,0 +1,28 @@
+# Voice sidecar settings. Everything here is optional; defaults are tuned for an RTX 4080 Super.
+
+# Reuse the agent's API host, port, token and data folder so the token is not copied here.
+repo_config = "../config.toml"   # relative to this file; the agent's own config.toml
+
+send_markers = true
+
+[audio]
+# Microphone: part of the device name ("Shure", "Wave"), an index from --list-devices, or ""
+# for the Windows default input.
+device = ""
+
+[model]
+name = "distil-large-v3"       # fast, near large-v3 accuracy, English only
+device = "cuda"
+compute_type = "float16"       # try "int8_float16" to save ~1 GB of VRAM
+fallback_model = "small.en"    # used on CPU if the GPU cannot start
+
+[vad]
+aggressiveness = 2             # 0-3, raise it if background noise creates phantom speech
+end_silence_ms = 600
+max_utterance_s = 12.0
+
+[triggers]
+file = "triggers.toml"
+mode = "hybrid"                # "hybrid" = natural phrases + prefix, "prefix_only" = prefix required
+min_confidence = 0.5
+prefix_words = ["mark", "marker", "tag"]
