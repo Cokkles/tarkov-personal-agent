@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from tarkov_agent.config import ObsSettings
 from tarkov_agent.integrations.obs_launcher import ObsLauncher, find_obs_executable
 
@@ -67,7 +69,9 @@ def test_launches_hidden_from_obs_folder(tmp_path: Path) -> None:
     assert launcher.owns_process
 
 
-def test_missing_executable_is_reported(tmp_path: Path) -> None:
+def test_missing_executable_is_reported(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # A real OBS install on the test machine must not satisfy this test.
+    monkeypatch.setattr("tarkov_agent.integrations.obs_launcher._DEFAULT_LOCATIONS", ())
     settings = ObsSettings(
         enabled=True, auto_launch=True, executable=tmp_path / "nope.exe"
     )
