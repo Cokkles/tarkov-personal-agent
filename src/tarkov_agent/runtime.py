@@ -4,9 +4,10 @@ import asyncio
 import logging
 
 from tarkov_agent.config import AppSettings
-from tarkov_agent.domain.state_machine import InvalidTransition
+from tarkov_agent.domain.state_machine import InvalidTransition, RaidSignal
 from tarkov_agent.integrations.obs_launcher import ObsLauncher
 from tarkov_agent.observers.logs import LogSignalClassifier, LogTailObserver
+from tarkov_agent.observers.maps import MapDetector
 from tarkov_agent.observers.process import ProcessObserver
 from tarkov_agent.services.coordinator import RaidCoordinator
 
@@ -32,6 +33,7 @@ class CompanionRuntime:
         )
         self._classifier = LogSignalClassifier(settings.logs.rules)
         self._obs_launcher = ObsLauncher(settings.obs)
+        self._maps = MapDetector()
 
     def request_stop(self) -> None:
         self._stop_event.set()
@@ -75,6 +77,7 @@ class CompanionRuntime:
 
     async def _watch_logs(self) -> None:
         async for line in self._log_observer.lines():
+            self._maps.observe(line.text, line.observed_at)
             for classified in self._classifier.classify(line):
                 if classified.confidence < self._settings.logs.minimum_auto_signal_confidence:
                     LOGGER.info(
@@ -91,10 +94,17 @@ class CompanionRuntime:
                         self._coordinator.lifecycle.state,
                     )
                     continue
+                payload: dict[str, str] | None = None
+                if classified.signal is RaidSignal.RAID_STARTED:
+                    detected = self._maps.current(line.observed_at)
+                    if detected:
+                        payload = {"map_name": detected}
+                    self._maps.clear()
                 try:
                     self._coordinator.handle_signal(
                         classified.signal,
                         occurred_at=line.observed_at,
+                        payload=payload,
                         reason=(
                             f"Log rule {classified.rule_name} matched "
                             f"{line.path.name}:{line.line_number}"

@@ -5,7 +5,7 @@ import re
 import shutil
 import subprocess
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -146,7 +146,9 @@ class MediaService:
         if recording is None:
             return []
         points: list[MediaNavigationPoint] = []
-        for event in self._repository.list_timeline_events(raid.id):
+        events = self._repository.list_timeline_events(raid.id)
+        shift_ms = self._video_shift_ms(events)
+        for event in events:
             if event.raid_offset_ms is None:
                 continue
             category = event.payload.get("category")
@@ -157,7 +159,10 @@ class MediaService:
                     event_type=event.event_type,
                     label=event.label,
                     raid_offset_ms=event.raid_offset_ms,
-                    seek_seconds=event.raid_offset_ms / 1000.0,
+                    seek_seconds=max(
+                        0.0,
+                        (event.raid_offset_ms + shift_ms) / 1000.0,
+                    ),
                     source=event.source,
                     category=(
                         str(category) if category is not None else None
@@ -183,9 +188,12 @@ class MediaService:
             raid,
             request,
         )
+        shift_ms = self._video_shift_ms(
+            self._repository.list_timeline_events(raid.id)
+        )
         start_seconds = max(
             0.0,
-            (offset_ms / 1000.0) - request.seconds_before,
+            ((offset_ms + shift_ms) / 1000.0) - request.seconds_before,
         )
         duration_seconds = request.seconds_before + request.seconds_after
         label = request.label or default_label
@@ -444,6 +452,64 @@ class MediaService:
             return float(numerator) / divisor if divisor else None
         except ValueError:
             return None
+
+    def extract_mic_wav(
+        self,
+        raid_id: UUID | str,
+        track: int,
+        destination: Path | None = None,
+    ) -> tuple[Path, datetime]:
+        """Write the mic track as a 16 kHz mono wav for the voice sidecar.
+
+        Returns the wav path and the wall-clock time of its first sample, which is what the
+        sidecar's --wav-start expects.
+        """
+        self._require_enabled()
+        raid = self._require_raid(raid_id)
+        recording = self._latest_available_recording(self._load_index(raid))
+        if recording is None:
+            raise MediaFinalizationError("No available indexed recording exists for this raid")
+        if raid.started_at is None:
+            raise MediaFinalizationError("This raid has no start time")
+        executable = shutil.which(self._settings.ffmpeg_path)
+        if executable is None:
+            raise MediaToolError("ffmpeg was not found on PATH")
+        wav = destination or (recording.canonical_path.parent / f"mic_track{track}.wav")
+        command = [
+            executable, "-y", "-i", str(recording.canonical_path),
+            "-map", f"0:a:{track - 1}", "-vn", "-ac", "1", "-ar", "16000",
+            "-sample_fmt", "s16", str(wav),
+        ]
+        try:
+            result = subprocess.run(
+                command, capture_output=True, text=True,
+                timeout=self._settings.clip_timeout_seconds, check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise MediaToolError(f"Unable to run ffmpeg: {exc}") from exc
+        if result.returncode != 0 or not wav.is_file():
+            wav.unlink(missing_ok=True)
+            raise MediaToolError(
+                result.stderr.strip()[-400:] or f"ffmpeg found no audio track {track}"
+            )
+        shift_ms = self._video_shift_ms(self._repository.list_timeline_events(raid.id))
+        started = raid.started_at - timedelta(milliseconds=shift_ms)
+        return wav, started
+
+    def _video_shift_ms(self, events: list[Any]) -> int:
+        """Milliseconds to add to a raid offset to get the position in the video.
+
+        The recording starts slightly after the raid start was detected, so a marker at raid
+        offset T sits at T minus that lag in the video. The fixed setting is added on top.
+        """
+        lag_ms = 0
+        for event in events:
+            if event.event_type == "recording_started":
+                value = event.payload.get("recording_lag_ms")
+                if isinstance(value, int | float):
+                    lag_ms = max(0, int(value))
+                break
+        return self._settings.timing_offset_ms - lag_ms
 
     def _resolve_clip_anchor(
         self,

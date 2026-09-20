@@ -95,6 +95,10 @@ class ObsSettings(BaseModel):
     # Profile (and optional scene collection) the agent switches OBS to, e.g. "OBS PPE Record".
     profile: str = ""
     scene_collection: str = ""
+    # Record the microphone on its own audio track so a raid can be re-transcribed later.
+    # mic_input_name is the OBS audio source (for example "Mic/Aux"); leave empty to skip.
+    mic_input_name: str = ""
+    mic_track: int = Field(default=2, ge=1, le=6)
     # Close OBS on exit only if this agent started it.
     close_on_exit: bool = False
 
@@ -162,6 +166,9 @@ class MediaSettings(BaseModel):
     clip_timeout_seconds: float = Field(default=180.0, gt=0.0, le=3600.0)
     default_clip_seconds_before: float = Field(default=10.0, ge=0.0, le=300.0)
     default_clip_seconds_after: float = Field(default=15.0, gt=0.0, le=600.0)
+    # Fixed nudge added to every video position, in milliseconds (positive = later in video).
+    # Use it to correct a consistent error you measure between markers and the video.
+    timing_offset_ms: int = Field(default=0, ge=-60_000, le=60_000)
 
 
 class DesktopSettings(BaseModel):

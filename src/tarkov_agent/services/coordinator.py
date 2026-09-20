@@ -38,6 +38,9 @@ from tarkov_agent.storage.database import RaidRepository
 FinalizationProgressCallback = Callable[[FinalizationStage, int, str], None]
 
 
+MAX_RECORDING_LAG_MS = 60_000
+
+
 class RaidCoordinator:
     """Coordinates lifecycle changes without reading or influencing game state."""
 
@@ -203,6 +206,15 @@ class RaidCoordinator:
         ):
             try:
                 status = self.recording.start()
+                # The video begins when OBS actually starts, a moment after the raid start
+                # was detected. Store that gap so seeks and clips land on the right frame.
+                lag_ms = max(
+                    0,
+                    min(
+                        MAX_RECORDING_LAG_MS,
+                        int((datetime.now(UTC) - timestamp).total_seconds() * 1000),
+                    ),
+                )
                 self._append_system_event(
                     raid,
                     "recording_started",
@@ -211,6 +223,7 @@ class RaidCoordinator:
                     {
                         "active": status.active,
                         "connected": status.connected,
+                        "recording_lag_ms": lag_ms,
                     },
                 )
             except ObsIntegrationError as exc:

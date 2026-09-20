@@ -24,6 +24,7 @@ from tarkov_agent.integrations.obs import ObsIntegrationError, build_recording_c
 from tarkov_agent.observers.logs import LogTailObserver
 from tarkov_agent.observers.process import ProcessObserver
 from tarkov_agent.services.diagnostics import DiagnosticCaptureService
+from tarkov_agent.services.media import MediaFinalizationError, MediaToolError
 from tarkov_agent.services.ppe import PPEDisabledError
 from tarkov_agent.services.recommendations import (
     RecommendationDisabledError,
@@ -252,6 +253,23 @@ def _command_capture_logs(args: argparse.Namespace) -> int:
     return 0
 
 
+def _command_extract_mic(args: argparse.Namespace) -> int:
+    context = _context(args.config)
+    track = args.track or context.settings.obs.mic_track
+    try:
+        wav, started = context.media.extract_mic_wav(args.raid_id, track)
+    except (LookupError, MediaFinalizationError, MediaToolError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    print(f"Mic audio: {wav}")
+    print("Transcribe it with the voice sidecar:")
+    print(
+        f'  python -m tarkov_voice.main --wav "{wav}" '
+        f'--wav-start {started.astimezone().replace(tzinfo=None).isoformat()}'
+    )
+    return 0
+
+
 def _command_ppe_rebuild(args: argparse.Namespace) -> int:
     context = _context(args.config)
     try:
@@ -417,6 +435,15 @@ def _parser() -> argparse.ArgumentParser:
     ppe_parser.add_argument("--config")
     ppe_parser.add_argument("--force", action="store_true")
     ppe_parser.set_defaults(func=_command_ppe_rebuild)
+
+    mic_parser = subparsers.add_parser(
+        "extract-mic",
+        help="Extract a raid's microphone track as a wav for re-transcription",
+    )
+    mic_parser.add_argument("--config")
+    mic_parser.add_argument("--raid-id", required=True)
+    mic_parser.add_argument("--track", type=int, default=0)
+    mic_parser.set_defaults(func=_command_extract_mic)
 
     truth_status_parser = subparsers.add_parser(
         "truth-status",

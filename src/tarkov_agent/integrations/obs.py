@@ -68,6 +68,7 @@ class ObsRecordingController:
                     f"Unable to connect to OBS WebSocket: {exc}"
                 ) from exc
             self._apply_profile()
+            self._apply_mic_track()
             return self._client
 
     def _apply_profile(self) -> None:
@@ -90,6 +91,34 @@ class ObsRecordingController:
                     client.set_current_profile(wanted_profile)
         except Exception as exc:
             LOGGER.warning("Could not switch OBS profile to %r: %s", wanted_profile, exc)
+
+    def _apply_mic_track(self) -> None:
+        """Put the microphone on its own recorded audio track (advanced output mode only)."""
+        client: Any = self._client
+        name = self._settings.mic_input_name
+        track = self._settings.mic_track
+        if client is None or not name:
+            return
+        try:
+            if client.get_record_status().output_active:
+                return
+            client.set_input_audio_tracks(name, {str(track): True})
+            mode = client.get_profile_parameter("Output", "Mode").parameter_value
+            if mode != "Advanced":
+                LOGGER.warning(
+                    "OBS output mode is %r. Set Settings > Output > Output Mode to Advanced "
+                    "so track %d is included in recordings.",
+                    mode,
+                    track,
+                )
+                return
+            raw = client.get_profile_parameter("AdvOut", "RecTracks").parameter_value
+            mask = int(raw or 0)
+            wanted = mask | (1 << (track - 1))
+            if wanted != mask:
+                client.set_profile_parameter("AdvOut", "RecTracks", str(wanted))
+        except Exception as exc:
+            LOGGER.warning("Could not set up the OBS mic track for %r: %s", name, exc)
 
     @staticmethod
     def _response_bool(response: object, name: str, default: bool = False) -> bool:
